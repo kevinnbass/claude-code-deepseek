@@ -83,11 +83,12 @@ app = FastAPI()
 
 # Get API keys from environment
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
-OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY")
 
 # Get model mapping configuration from environment
-BIG_MODEL = os.environ.get("BIG_MODEL", "gpt-4o")
-SMALL_MODEL = os.environ.get("SMALL_MODEL", "gpt-4o-mini")
+# deepseek-chat is recommended for all tasks including coding
+BIG_MODEL = os.environ.get("BIG_MODEL", "deepseek-chat")
+SMALL_MODEL = os.environ.get("SMALL_MODEL", "deepseek-chat")
 
 # Models for Anthropic API requests
 class ContentBlockText(BaseModel):
@@ -146,27 +147,27 @@ class MessagesRequest(BaseModel):
         # Store the original model name
         original_model = v
         
-        # Check if we're using OpenAI models and need to swap
+        # Check if we're using Deepseek models and need to swap
         if USE_OPENAI_MODELS:
             # Remove anthropic/ prefix if it exists
             if v.startswith('anthropic/'):
                 v = v[10:]  # Remove 'anthropic/' prefix
             
-            # Swap Haiku with small model (default: gpt-4o-mini)
+            # Swap Haiku with small model (default: deepseek-chat)
             if 'haiku' in v.lower():
-                new_model = f"openai/{SMALL_MODEL}"
+                new_model = f"deepseek/{SMALL_MODEL}"
                 logger.debug(f"📌 MODEL MAPPING: {original_model} ➡️ {new_model}")
                 v = new_model
             
-            # Swap any Sonnet model with big model (default: gpt-4o)
+            # Swap any Sonnet model with big model (default: deepseek-chat)
             elif 'sonnet' in v.lower():
-                new_model = f"openai/{BIG_MODEL}"
+                new_model = f"deepseek/{BIG_MODEL}"
                 logger.debug(f"📌 MODEL MAPPING: {original_model} ➡️ {new_model}")
                 v = new_model
             
-            # Keep the model as is but add openai/ prefix if not already present
-            elif not v.startswith('openai/'):
-                new_model = f"openai/{v}"
+            # Keep the model as is but add deepseek/ prefix if not already present
+            elif not v.startswith('deepseek/'):
+                new_model = f"deepseek/{v}"
                 logger.debug(f"📌 MODEL MAPPING: {original_model} ➡️ {new_model}")
                 v = new_model
                 
@@ -212,21 +213,21 @@ class TokenCountRequest(BaseModel):
             if v.startswith('anthropic/'):
                 v = v[10:]  
             
-            # Swap Haiku with small model (default: gpt-4o-mini)
+            # Swap Haiku with small model (default: deepseek-chat)
             if 'haiku' in v.lower():
-                new_model = f"openai/{SMALL_MODEL}"
+                new_model = f"deepseek/{SMALL_MODEL}"
                 logger.debug(f"📌 MODEL MAPPING: {original_model} ➡️ {new_model}")
                 v = new_model
             
-            # Swap any Sonnet model with big model (default: gpt-4o)
+            # Swap any Sonnet model with big model (default: deepseek-chat)
             elif 'sonnet' in v.lower():
-                new_model = f"openai/{BIG_MODEL}"
+                new_model = f"deepseek/{BIG_MODEL}"
                 logger.debug(f"📌 MODEL MAPPING: {original_model} ➡️ {new_model}")
                 v = new_model
             
-            # Keep the model as is but add openai/ prefix if not already present
-            elif not v.startswith('openai/'):
-                new_model = f"openai/{v}"
+            # Keep the model as is but add deepseek/ prefix if not already present
+            elif not v.startswith('deepseek/'):
+                new_model = f"deepseek/{v}"
                 logger.debug(f"📌 MODEL MAPPING: {original_model} ➡️ {new_model}")
                 v = new_model
             
@@ -461,11 +462,11 @@ def convert_anthropic_to_litellm(anthropic_request: MessagesRequest) -> Dict[str
                 
                 messages.append({"role": msg.role, "content": processed_content})
     
-    # Cap max_tokens for OpenAI models to their limit of 16384
+    # Cap max_tokens for Deepseek models to their limit of 8192
     max_tokens = anthropic_request.max_tokens
-    if anthropic_request.model.startswith("openai/") or USE_OPENAI_MODELS:
-        max_tokens = min(max_tokens, 16384)
-        logger.debug(f"Capping max_tokens to 16384 for OpenAI model (original value: {anthropic_request.max_tokens})")
+    if anthropic_request.model.startswith("deepseek/") or USE_OPENAI_MODELS:
+        max_tokens = min(max_tokens, 8192)
+        logger.debug(f"Capping max_tokens to 8192 for Deepseek model (original value: {anthropic_request.max_tokens})")
     
     # Create LiteLLM request dict
     litellm_request = {
@@ -543,8 +544,8 @@ def convert_litellm_to_anthropic(litellm_response: Union[Dict[str, Any], Any],
         clean_model = original_request.model
         if clean_model.startswith("anthropic/"):
             clean_model = clean_model[len("anthropic/"):]
-        elif clean_model.startswith("openai/"):
-            clean_model = clean_model[len("openai/"):]
+        elif clean_model.startswith("deepseek/"):
+            clean_model = clean_model[len("deepseek/"):]
         
         # Check if this is a Claude model (which supports content blocks)
         is_claude_model = clean_model.startswith("claude-")
@@ -1012,8 +1013,8 @@ async def create_message(
         clean_model = request.model
         if clean_model.startswith("anthropic/"):
             clean_model = clean_model[len("anthropic/"):]
-        elif clean_model.startswith("openai/"):
-            clean_model = clean_model[len("openai/"):]
+        elif clean_model.startswith("deepseek/"):
+            clean_model = clean_model[len("deepseek/"):]
         
         logger.debug(f"📊 PROCESSING REQUEST: Model={request.model}, Stream={request.stream}")
         
@@ -1021,18 +1022,18 @@ async def create_message(
         litellm_request = convert_anthropic_to_litellm(request)
         
         # Determine which API key to use based on the model
-        if request.model.startswith("openai/"):
-            litellm_request["api_key"] = OPENAI_API_KEY
-            logger.debug(f"Using OpenAI API key for model: {request.model}")
+        if request.model.startswith("deepseek/"):
+            litellm_request["api_key"] = DEEPSEEK_API_KEY
+            logger.debug(f"Using Deepseek API key for model: {request.model}")
         else:
             litellm_request["api_key"] = ANTHROPIC_API_KEY
             logger.debug(f"Using Anthropic API key for model: {request.model}")
         
-        # For OpenAI models - modify request format to work with limitations
-        if "openai" in litellm_request["model"] and "messages" in litellm_request:
-            logger.debug(f"Processing OpenAI model request: {litellm_request['model']}")
+        # For Deepseek models - modify request format to work with limitations
+        if "deepseek" in litellm_request["model"] and "messages" in litellm_request:
+            logger.debug(f"Processing Deepseek model request: {litellm_request['model']}")
             
-            # For OpenAI models, we need to convert content blocks to simple strings
+            # For Deepseek models, we need to convert content blocks to simple strings
             # and handle other requirements
             for i, msg in enumerate(litellm_request["messages"]):
                 # Special case - handle message content directly when it's a list of tool_result
@@ -1266,8 +1267,8 @@ async def count_tokens(
         clean_model = request.model
         if clean_model.startswith("anthropic/"):
             clean_model = clean_model[len("anthropic/"):]
-        elif clean_model.startswith("openai/"):
-            clean_model = clean_model[len("openai/"):]
+        elif clean_model.startswith("deepseek/"):
+            clean_model = clean_model[len("deepseek/"):]
         
         # Convert the messages to a format LiteLLM can understand
         converted_request = convert_anthropic_to_litellm(
@@ -1322,7 +1323,7 @@ async def count_tokens(
 
 @app.get("/")
 async def root():
-    return {"message": "Anthropic Proxy for LiteLLM"}
+    return {"message": "Anthropic Proxy for Deepseek using LiteLLM"}
 
 # Define ANSI color codes for terminal output
 class Colors:
@@ -1336,8 +1337,8 @@ class Colors:
     BOLD = "\033[1m"
     UNDERLINE = "\033[4m"
     DIM = "\033[2m"
-def log_request_beautifully(method, path, claude_model, openai_model, num_messages, num_tools, status_code):
-    """Log requests in a beautiful, twitter-friendly format showing Claude to OpenAI mapping."""
+def log_request_beautifully(method, path, claude_model, deepseek_model, num_messages, num_tools, status_code):
+    """Log requests in a beautiful, twitter-friendly format showing Claude to Deepseek mapping."""
     # Format the Claude model name nicely
     claude_display = f"{Colors.CYAN}{claude_model}{Colors.RESET}"
     
@@ -1346,11 +1347,11 @@ def log_request_beautifully(method, path, claude_model, openai_model, num_messag
     if "?" in endpoint:
         endpoint = endpoint.split("?")[0]
     
-    # Extract just the OpenAI model name without provider prefix
-    openai_display = openai_model
-    if "/" in openai_display:
-        openai_display = openai_display.split("/")[-1]
-    openai_display = f"{Colors.GREEN}{openai_display}{Colors.RESET}"
+    # Extract just the Deepseek model name without provider prefix
+    deepseek_display = deepseek_model
+    if "/" in deepseek_display:
+        deepseek_display = deepseek_display.split("/")[-1]
+    deepseek_display = f"{Colors.GREEN}{deepseek_display}{Colors.RESET}"
     
     # Format tools and messages
     tools_str = f"{Colors.MAGENTA}{num_tools} tools{Colors.RESET}"
@@ -1362,7 +1363,7 @@ def log_request_beautifully(method, path, claude_model, openai_model, num_messag
 
     # Put it all together in a clear, beautiful format
     log_line = f"{Colors.BOLD}{method} {endpoint}{Colors.RESET} {status_str}"
-    model_line = f"{claude_display} → {openai_display} {tools_str} {messages_str}"
+    model_line = f"{claude_display} → {deepseek_display} {tools_str} {messages_str}"
     
     # Print to console
     print(log_line)
