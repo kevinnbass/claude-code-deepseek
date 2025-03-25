@@ -90,6 +90,9 @@ DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY")
 BIG_MODEL = os.environ.get("BIG_MODEL", "deepseek-chat")
 SMALL_MODEL = os.environ.get("SMALL_MODEL", "deepseek-chat")
 
+# Chain of Thought system prompt for reasoning (used with Sonnet models)
+COT_SYSTEM_PROMPT = "You are a helpful assistant that uses chain-of-thought reasoning. For complex questions, always break down your reasoning step-by-step before giving an answer."
+
 # Models for Anthropic API requests
 class ContentBlockText(BaseModel):
     type: Literal["text"]
@@ -160,10 +163,25 @@ class MessagesRequest(BaseModel):
                 v = new_model
             
             # Swap any Sonnet model with big model (default: deepseek-chat)
+            # Also add Chain-of-Thought system prompt for reasoning
             elif 'sonnet' in v.lower():
                 new_model = f"deepseek/{BIG_MODEL}"
-                logger.debug(f"📌 MODEL MAPPING: {original_model} ➡️ {new_model}")
+                logger.debug(f"📌 MODEL MAPPING: {original_model} ➡️ {new_model} with CoT")
                 v = new_model
+                
+                # Add the CoT system prompt for Sonnet models
+                values = info.data
+                if isinstance(values, dict):
+                    # If system prompt already exists, prepend CoT to it
+                    if values.get("system"):
+                        if isinstance(values["system"], str):
+                            values["system"] = f"{COT_SYSTEM_PROMPT}\n\n{values['system']}"
+                        # If it's a list, add CoT to the beginning
+                        elif isinstance(values["system"], list):
+                            values["system"].insert(0, {"type": "text", "text": COT_SYSTEM_PROMPT})
+                    else:
+                        # No system prompt exists, add the CoT system prompt
+                        values["system"] = COT_SYSTEM_PROMPT
             
             # Keep the model as is but add deepseek/ prefix if not already present
             elif not v.startswith('deepseek/'):
@@ -220,10 +238,25 @@ class TokenCountRequest(BaseModel):
                 v = new_model
             
             # Swap any Sonnet model with big model (default: deepseek-chat)
+            # Also add Chain-of-Thought system prompt for reasoning
             elif 'sonnet' in v.lower():
                 new_model = f"deepseek/{BIG_MODEL}"
-                logger.debug(f"📌 MODEL MAPPING: {original_model} ➡️ {new_model}")
+                logger.debug(f"📌 MODEL MAPPING: {original_model} ➡️ {new_model} with CoT")
                 v = new_model
+                
+                # Add the CoT system prompt for Sonnet models
+                values = info.data
+                if isinstance(values, dict):
+                    # If system prompt already exists, prepend CoT to it
+                    if values.get("system"):
+                        if isinstance(values["system"], str):
+                            values["system"] = f"{COT_SYSTEM_PROMPT}\n\n{values['system']}"
+                        # If it's a list, add CoT to the beginning
+                        elif isinstance(values["system"], list):
+                            values["system"].insert(0, {"type": "text", "text": COT_SYSTEM_PROMPT})
+                    else:
+                        # No system prompt exists, add the CoT system prompt
+                        values["system"] = COT_SYSTEM_PROMPT
             
             # Keep the model as is but add deepseek/ prefix if not already present
             elif not v.startswith('deepseek/'):

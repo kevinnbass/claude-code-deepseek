@@ -39,9 +39,9 @@ When using Deepseek models with Claude Code through this proxy:
 1. **Token Limit**: Deepseek models have a significantly smaller context window (8192 tokens) compared to Claude models (200K for Sonnet, 1M for Opus)
 
 2. **Model Selection**: 
-   - For general tasks: Use `deepseek-chat`
-   - For coding tasks: Always use `deepseek-chat` (not deepseek-coder)
-   - For reasoning-heavy tasks: Use `deepseek-chat` with a Chain-of-Thought (CoT) system prompt
+   - **Haiku models** map to `deepseek-chat` (general tasks)
+   - **Sonnet models** map to `deepseek-chat` + automatic Chain-of-Thought (CoT) system prompt (optimal for reasoning tasks)
+   - All coding tasks use `deepseek-chat` regardless of the selected model
 
 3. **Function Calling**: Deepseek supports function calling in an OpenAI-compatible format
 
