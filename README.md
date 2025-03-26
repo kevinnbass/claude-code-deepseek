@@ -2,6 +2,8 @@
 
 A proxy server that lets you use Claude Code with Deepseek and Google Gemini models, providing a cost-effective alternative while maintaining high-quality code assistance capabilities. This solution delivers up to **96% cost savings** compared to using Claude directly, with comparable or better performance for many tasks.
 
+**✨ SPECIAL FEATURE: `/brainstorm` command connects directly to Claude 3.7 Sonnet for exceptional brainstorming quality! ✨**
+
 ![DEEPSEEK CODE banner](https://raw.githubusercontent.com/kevinnbass/claude-code-deepseek/main/assets/banner.png)
 
 ## What This Does 🔄
@@ -20,6 +22,7 @@ The result: You can use Claude Code's excellent interface while leveraging more 
 
 - **Massive Cost Savings**: Use Claude Code with up to 96% lower costs
 - **Similar Performance**: Comparable response quality for code tasks
+- **Best of Both Worlds**: Use cost-effective models for most tasks, but access Claude 3.7 for brainstorming
 - **Transparency**: Use the same Claude Code interface without changing your workflow
 - **Flexibility**: Choose which models to use for different types of tasks
 - **Customizability**: Added features not available in Claude Code by default
