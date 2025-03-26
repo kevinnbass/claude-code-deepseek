@@ -138,14 +138,22 @@ All core capabilities have been verified through comprehensive testing:
 
 ### Performance Metrics
 
-| Feature | Response Time |
-|---------|--------------|
-| Simple text generation (Gemini) | ~0.9s |
-| Tool usage (Gemini) | ~0.6s |
-| Multi-turn conversation (Gemini) | ~0.6s |
-| Complex reasoning (Deepseek) | ~43s |
-| Code generation (Deepseek) | ~20s |
-| Streaming responses | Real-time |
+Latest benchmark testing shows the following response times:
+
+| Task Type | Gemini Flash | Deepseek Chat | Claude (estimated) |
+|-----------|--------------|---------------|-------------------|
+| Simple text generation | 0.7-0.8s | - | ~1-2s |
+| Tool usage (calculator) | 0.6-0.7s | - | ~1-2s |
+| Multi-turn conversation | 0.5-0.6s | - | ~1-2s |
+| Complex reasoning | - | 16-17s | ~2-3s |
+| Code generation | - | 18-19s | ~3-4s |
+| Streaming responses | Real-time | Real-time | Real-time |
+
+**Key observations:**
+* Gemini Flash is extremely fast for simple tasks and tool usage
+* Deepseek Chat provides high-quality outputs for complex tasks, though with longer latency
+* All tests pass with 100% success rate in comprehensive testing
+* Best performance is achieved with `--always-cot` flag for reasoning tasks
 
 ## Model Provider Information 🏢
 

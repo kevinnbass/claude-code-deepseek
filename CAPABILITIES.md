@@ -42,13 +42,13 @@ Recent comprehensive testing verifies compatibility with all core Claude Code ca
 
 | Test Case | Status | Performance | Notes |
 |-----------|--------|-------------|-------|
-| Simple text generation | ✅ PASS | ~0.9s | Gemini provides fast, high-quality responses |
-| Calculator tool usage | ✅ PASS | ~0.6s | Proper function calling format |
-| Multiple tool usage | ✅ PASS | ~0.6s | Successfully handles multiple tools in sequence |
-| Multi-turn conversation | ✅ PASS | ~0.6s | Maintains context across messages |
-| Complex content blocks | ✅ PASS | ~0.5s | Correctly processes different content types |
-| Chain-of-Thought reasoning | ✅ PASS | ~43s | Successfully solves complex problems with step-by-step reasoning |
-| Code generation | ✅ PASS | ~20s | Generates correct, well-formatted code |
+| Simple text generation | ✅ PASS | 0.7-0.8s | Gemini provides fast, high-quality responses |
+| Calculator tool usage | ✅ PASS | 0.6-0.7s | Proper function calling format |
+| Multiple tool usage | ✅ PASS | 0.6-0.7s | Successfully handles multiple tools in sequence |
+| Multi-turn conversation | ✅ PASS | 0.5-0.6s | Maintains context across messages |
+| Complex content blocks | ✅ PASS | 0.5-0.6s | Correctly processes different content types |
+| Chain-of-Thought reasoning | ✅ PASS | 16-17s | Successfully solves complex problems with step-by-step reasoning |
+| Code generation | ✅ PASS | 18-19s | Generates correct, well-formatted code |
 | Streaming text | ✅ PASS | Real-time | All required event types present |
 | Streaming with tools | ✅ PASS | Real-time | Proper handling of streaming tool calls |
 
@@ -76,8 +76,9 @@ When using alternative models with Claude Code through this proxy:
    - Gemini Flash is particularly fast for tool usage (~0.6s response time)
 
 5. **Performance Tradeoffs**: 
-   - Gemini Flash: Very fast (~0.9s) for simple tasks, chat, and tool usage
-   - Deepseek: Slower but strong for reasoning (~43s) and code generation (~20s)
+   - Gemini Flash: Extremely fast (0.5-0.8s) for simple tasks, chat, and tool usage
+   - Deepseek: Slower but high-quality for reasoning (16-17s) and code generation (18-19s)
+   - These times are from latest benchmark tests run in March 2025
    - Consider your use case when choosing which model to use
 
 6. **Customization**:
