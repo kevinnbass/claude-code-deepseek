@@ -107,7 +107,7 @@ This proxy extends Claude Code with custom slash commands for specialized tasks:
    ```
 
    **Server Options:**
-   - `--always-cot`: Recommended flag that significantly improves reasoning capability by adding Chain-of-Thought prompting for all Sonnet model requests
+   - `--always-cot`: Recommended flag that significantly improves reasoning capability by adding Chain-of-Thought prompting for all Sonnet model requests (used automatically for `/brainstorm` command)
    - Debug mode can be enabled by setting `DEBUG=true` in your `.env` file
 
 ### Using with Claude Code 🖥️
@@ -206,7 +206,7 @@ Customize which models are used via environment variables in your `.env` file:
 ```
 DEEPSEEK_API_KEY=your-deepseek-key
 GEMINI_API_KEY=your-gemini-key
-BIG_MODEL=deepseek-chat         # Model to use for Sonnet (complex tasks)
+BIG_MODEL=deepseek-chat         # Model to use for Sonnet (complex tasks) and /brainstorm
 SMALL_MODEL=gemini-2.0-flash    # Model to use for Haiku (simpler tasks)
 ```
 
@@ -219,7 +219,7 @@ You can change the models used for each Claude model type. For example:
 The proxy supports automatic Chain-of-Thought (CoT) prompting to enhance reasoning capabilities:
 
 - **Default behavior**: CoT prompting is applied to Sonnet models only when thinking mode is enabled
-- **Always-CoT mode**: Force CoT prompting for all Sonnet requests with the `--always-cot` flag (recommended)
+- **Always-CoT mode**: Force CoT prompting for all Sonnet requests with the `--always-cot` flag (recommended and automatically used for `/brainstorm` command)
 
 ```bash
 python server.py --always-cot

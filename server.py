@@ -16,6 +16,9 @@ from datetime import datetime
 import sys
 import argparse
 
+# Define Anthropic API URL
+ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages"
+
 # Load environment variables from .env file
 load_dotenv()
 
