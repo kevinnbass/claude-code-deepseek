@@ -1,5 +1,18 @@
-# Environment variables
+# Environment variables and credentials
 .env
+.env.*
+!.env.example
+
+# Logs
+logs/
+*.log
+
+# Test artifacts
+tests/test_results/
+tests/backups/
+comparison_*.json
+comparison_*.png
+direct_comparison_results.json
 
 # Python
 __pycache__/

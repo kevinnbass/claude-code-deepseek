@@ -14,12 +14,19 @@ This proxy acts as a bridge between the Claude Code client and alternative AI mo
 
 The result: You can use Claude Code's excellent interface while leveraging more affordable Deepseek and Gemini models.
 
+### New Feature: Custom Commands 🌟
+
+This proxy extends Claude Code with custom slash commands for specialized tasks:
+
+- **`/brainstorm`** - A special command that connects directly to Claude 3.7 Sonnet for high-quality code brainstorming (requires Anthropic API key)
+
 ## Quick Start ⚡
 
 ### Prerequisites
 
 - Deepseek API key 🔑 (for Sonnet models)
 - Gemini API key 🔑 (for Haiku models)
+- Anthropic API key 🔑 (optional, required only for `/brainstorm` command)
 - Node.js (for Claude Code CLI)
 
 ### Setup 🛠️
@@ -43,8 +50,12 @@ The result: You can use Claude Code's excellent interface while leveraging more 
 3. **Configure your API keys**:
    Create a `.env` file with:
    ```
+   # Required: At least one of these is needed
    DEEPSEEK_API_KEY=your-deepseek-key
    GEMINI_API_KEY=your-gemini-key
+   
+   # Optional: Only needed for /brainstorm command
+   ANTHROPIC_API_KEY=your-anthropic-key
    ```
 
 4. **Start the proxy server**:
@@ -57,7 +68,7 @@ The result: You can use Claude Code's excellent interface while leveraging more 
    uv run server.py --always-cot
    ```
 
-   The `--always-cot` flag is recommended as it significantly improves reasoning capability by adding Chain-of-Thought prompting for all Sonnet model requests.
+   The `--always-cot` flag is recommended as it significantly improves reasoning capability by adding Chain-of-Thought prompting for all Sonnet model requests. When the server starts, you'll see a colorful ASCII art display and information about the server configuration.
 
 ### Using with Claude Code 🖥️
 
@@ -74,6 +85,27 @@ The result: You can use Claude Code's excellent interface while leveraging more 
    Note: Using the IP address directly (127.0.0.1) instead of localhost can resolve connection issues.
 
 3. **Start coding!** 👨‍💻👩‍💻 Your Claude Code client will now use alternative models through the proxy.
+
+### Custom Commands 🤖
+
+This proxy extends Claude Code with additional features:
+
+#### `/brainstorm` Command
+
+Generate creative ideas for any topic or problem:
+
+```
+/brainstorm How can I optimize CI/CD pipelines for our microservices architecture?
+```
+
+The `/brainstorm` command:
+- Uses a specialized system prompt tailored for code-related brainstorming
+- **Connects directly to Claude 3.7 Sonnet** (requires ANTHROPIC_API_KEY in your .env file)
+- Generates at least 5 diverse, actionable ideas with implementation details and code snippets
+- Includes tradeoffs and considerations for each solution
+- Perfect for architecture decisions, code optimization, and solving complex technical challenges
+
+Note: The `/brainstorm` command is the only feature that uses the actual Anthropic API; all other interactions still use the cost-saving Deepseek/Gemini models.
 
 ## Features 🌟
 
@@ -119,6 +151,7 @@ Our recent testing confirms full compatibility with:
 - ✅ **Streaming responses** - Proper event handling for streaming text and tool use 
 - ✅ **Multi-turn conversations** - Context preservation across multiple turns
 - ✅ **System prompts** - Full support for system instructions
+- ✅ **Custom commands** - Special slash commands with enhanced functionality
 
 ## Test Results 📊
 
@@ -135,6 +168,55 @@ All core capabilities have been verified through comprehensive testing:
 | Code generation | ✅ PASS | Generates correct, well-formatted code |
 | Streaming text | ✅ PASS | All required event types present |
 | Streaming with tools | ✅ PASS | Proper handling of streaming tool calls |
+
+### Running Tests
+
+A comprehensive test suite is included to verify functionality and performance:
+
+```bash
+# Run all tests
+python run_tests.py --all
+
+# Run only basic functionality tests
+python run_tests.py --basic
+
+# Run performance comparison tests
+python run_tests.py --performance
+
+# Test only proxy functionality (skip Anthropic API)
+python run_tests.py --all --proxy-only
+
+# Test with specific Anthropic API key
+python run_tests.py --all --anthropic-key=your-api-key
+```
+
+Test results and performance comparisons are saved to the `tests/test_results/` directory.
+
+### Project Structure
+
+```
+claude-code-deepseek/
+├── server.py           # Main proxy server implementation
+├── run_tests.py        # Primary test runner script
+├── logs/               # Server logs
+├── .env                # API keys and configuration (create from .env.example)
+├── .env.example        # Template for environment variables
+├── tests/              # Test package
+│   ├── __init__.py     # Common test constants and data
+│   ├── utils.py        # Shared test utilities
+│   ├── basic_tests.py  # Basic functionality tests
+│   ├── performance_tests.py  # Performance comparison tests
+│   ├── api_key_test.py       # Anthropic API key validation
+│   ├── run_tests.py          # Package test runner
+│   ├── simple_comparison.py  # Simple performance comparison
+│   ├── backups/              # Original test file backups 
+│   └── test_results/         # Test output directory
+```
+
+The codebase is organized for maintainability with separated concerns:
+- The main server implements the proxy functionality and custom commands
+- A comprehensive test suite verifies functionality and performance 
+- Logs are stored in a dedicated directory for easier debugging
 
 ### Performance Metrics
 

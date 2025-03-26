@@ -1,14 +1,23 @@
 #!/usr/bin/env python3
 """
-Mini-test script to check if an Anthropic API key works.
+Test Anthropic API key validity.
+
+This script checks if the provided Anthropic API key works
+by making a simple request to the Anthropic API.
 """
 
-import httpx
+import os
+import json
 import sys
 import asyncio
-import json
+import argparse
+import httpx
+from dotenv import load_dotenv
+from . import ANTHROPIC_API_URL
 
-ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages"
+# Load environment variables
+load_dotenv()
+
 ANTHROPIC_VERSION = "2023-06-01"
 
 async def test_key(api_key):
@@ -53,11 +62,27 @@ async def test_key(api_key):
 
 async def main():
     """Test multiple API keys."""
-    if len(sys.argv) < 2:
-        print("Usage: python test_anthropic_key.py API_KEY1 [API_KEY2 ...]")
+    parser = argparse.ArgumentParser(description="Test Anthropic API keys")
+    parser.add_argument("keys", nargs="*", help="API key(s) to test")
+    parser.add_argument("--env", action="store_true", help="Test API key from ANTHROPIC_API_KEY environment variable")
+    args = parser.parse_args()
+    
+    keys = args.keys[:]
+    
+    # Add environment key if requested
+    if args.env:
+        env_key = os.environ.get("ANTHROPIC_API_KEY")
+        if env_key:
+            keys.append(env_key)
+            print(f"Added API key from environment variable")
+        else:
+            print("No API key found in ANTHROPIC_API_KEY environment variable")
+    
+    if not keys:
+        print("Error: No API keys provided")
+        print("Usage: python -m tests.api_key_test API_KEY1 [API_KEY2 ...] [--env]")
         return 1
     
-    keys = sys.argv[1:]
     results = []
     
     for key in keys:
@@ -72,7 +97,7 @@ async def main():
     else:
         print("\n❌ None of the API keys work.")
     
-    return 0
+    return 0 if any(results) else 1
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    sys.exit(asyncio.run(main()))

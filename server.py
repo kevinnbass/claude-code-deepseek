@@ -19,10 +19,20 @@ import argparse
 # Load environment variables from .env file
 load_dotenv()
 
+# Ensure logs directory exists
+os.makedirs("logs", exist_ok=True)
+
+# Check for DEBUG environment variable
+DEBUG_MODE = os.environ.get("DEBUG", "").lower() in ("true", "1", "yes", "y", "on")
+
 # Configure logging
 logging.basicConfig(
-    level=logging.WARN,  # Change to INFO level to show more details
+    level=logging.INFO if DEBUG_MODE else logging.WARN,
     format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler("logs/server.log"),
+        logging.StreamHandler()
+    ]
 )
 logger = logging.getLogger(__name__)
 
@@ -1133,6 +1143,7 @@ async def create_message(
     request: MessagesRequest,
     raw_request: Request
 ):
+    """Main endpoint for message creation - handles special commands like /brainstorm."""
     try:
         # print the body here
         body = await raw_request.body()
@@ -1140,6 +1151,38 @@ async def create_message(
         # Parse the raw body as JSON since it's bytes
         body_json = json.loads(body.decode('utf-8'))
         original_model = body_json.get("model", "unknown")
+        
+        # Check for custom commands in the user message
+        if "messages" in body_json and body_json["messages"]:
+            for i, msg in enumerate(body_json["messages"]):
+                if msg.get("role") == "user":
+                    # Check for commands in string content
+                    if isinstance(msg.get("content"), str):
+                        content = msg.get("content", "")
+                        # Check for /brainstorm command
+                        if content.strip().startswith("/brainstorm "):
+                            logger.info(f"🧠 Detected /brainstorm command - redirecting to brainstorm endpoint")
+                            # Extract the query (everything after /brainstorm )
+                            query = content.strip()[12:].strip()
+                            # Create a new message with just the query
+                            body_json["messages"][i]["content"] = query
+                            # Forward to brainstorm endpoint
+                            return await brainstorm(raw_request)
+                    
+                    # Check for commands in content blocks
+                    elif isinstance(msg.get("content"), list):
+                        for j, block in enumerate(msg["content"]):
+                            if isinstance(block, dict) and block.get("type") == "text":
+                                text = block.get("text", "")
+                                # Check for /brainstorm command
+                                if text.strip().startswith("/brainstorm "):
+                                    logger.info(f"🧠 Detected /brainstorm command - redirecting to brainstorm endpoint")
+                                    # Extract the query (everything after /brainstorm )
+                                    query = text.strip()[12:].strip()
+                                    # Create a new block with just the query
+                                    body_json["messages"][i]["content"][j]["text"] = query
+                                    # Forward to brainstorm endpoint
+                                    return await brainstorm(raw_request)
         
         # Get the display name for logging, just the model name without provider prefix
         display_model = original_model
@@ -1497,6 +1540,157 @@ async def count_tokens(
         logger.error(f"Error counting tokens: {str(e)}\n{error_traceback}")
         raise HTTPException(status_code=500, detail=f"Error counting tokens: {str(e)}")
 
+# Specialized prompt templates
+BRAINSTORM_PROMPT = """I want you to act as a code expert brainstorming assistant. Your goal is to help generate diverse, creative, and actionable ideas for improving or solving coding problems.
+
+For the user's input topic or question about code, please:
+1. Generate at least 5 distinct ideas or approaches
+2. For each idea, provide:
+   - A concise title or summary
+   - A brief explanation (1-2 sentences)
+   - At least one specific example, implementation detail, or code snippet
+   - Any potential tradeoffs or considerations
+3. Include a mix of conventional and innovative solutions
+4. Consider different perspectives, constraints, and opportunities
+5. Leverage best practices and modern development techniques
+6. Focus on providing actionable, practical advice for implementation
+
+Present the ideas in a clear, structured format. Focus on being comprehensive yet concise.
+
+User's topic: {user_input}
+"""
+
+@app.post("/v1/brainstorm")
+async def brainstorm(
+    raw_request: Request
+):
+    """Custom endpoint for brainstorming - enhances prompts with a specialized system prompt."""
+    try:
+        # Get the raw request body
+        body = await raw_request.body()
+        body_json = json.loads(body.decode('utf-8'))
+        
+        # Log the incoming brainstorm request
+        logger.debug(f"📊 PROCESSING BRAINSTORM REQUEST")
+        
+        # Extract user query from messages
+        user_input = ""
+        if "messages" in body_json and body_json["messages"]:
+            for msg in body_json["messages"]:
+                if msg.get("role") == "user":
+                    if isinstance(msg.get("content"), str):
+                        user_input = msg["content"]
+                        logger.debug(f"📌 Extracted user input: {user_input[:50]}...")
+                        break
+                    elif isinstance(msg.get("content"), list):
+                        for block in msg["content"]:
+                            if isinstance(block, dict) and block.get("type") == "text":
+                                user_input = block.get("text", "")
+                                logger.debug(f"📌 Extracted user input (from block): {user_input[:50]}...")
+                                break
+        
+        if not user_input:
+            return JSONResponse(
+                status_code=400,
+                content={"error": "No user message found in request"}
+            )
+        
+        # Create a new request with the brainstorming system prompt
+        enhanced_request = body_json.copy()
+        
+        # Replace or add the system prompt
+        enhanced_request["system"] = BRAINSTORM_PROMPT.format(user_input=user_input)
+        
+        # Use Claude 3.7 Sonnet directly from Anthropic for this special command
+        enhanced_request["model"] = "claude-3-7-sonnet-20250219"
+        
+        # Check if Anthropic API key is available
+        if not ANTHROPIC_API_KEY:
+            logger.error("No Anthropic API key found for /brainstorm command - this command requires access to Claude 3.7")
+            return JSONResponse(
+                status_code=500,
+                content={"error": "The /brainstorm command requires an Anthropic API key. Please set ANTHROPIC_API_KEY in your .env file."}
+            )
+            
+        logger.info(f"🔄 Using Claude 3.7 Sonnet directly from Anthropic API for /brainstorm command")
+        
+        # Prepare the Anthropic request
+        anthropic_request = {
+            "model": enhanced_request["model"],
+            "max_tokens": enhanced_request.get("max_tokens", 1500),
+            "messages": enhanced_request["messages"],
+            "system": enhanced_request["system"],
+            "stream": enhanced_request.get("stream", False)
+        }
+        
+        # Add any optional parameters
+        for param in ["temperature", "top_p", "top_k"]:
+            if param in enhanced_request:
+                anthropic_request[param] = enhanced_request[param]
+                
+        # Prepare Anthropic API headers
+        anthropic_headers = {
+            "x-api-key": ANTHROPIC_API_KEY,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json",
+        }
+        
+        # Process the request directly through Anthropic API
+        if anthropic_request.get("stream", False):
+            async def stream_anthropic_response():
+                async with httpx.AsyncClient() as client:
+                    async with client.stream(
+                        "POST", 
+                        ANTHROPIC_API_URL, 
+                        json=anthropic_request,
+                        headers=anthropic_headers,
+                        timeout=60
+                    ) as response:
+                        if response.status_code != 200:
+                            error_text = await response.aread()
+                            logger.error(f"Error from Anthropic API: {error_text.decode('utf-8')}")
+                            error_json = {"error": f"Anthropic API error: {response.status_code}"}
+                            yield f"data: {json.dumps(error_json)}\n\n"
+                            yield "data: [DONE]\n\n"
+                            return
+                            
+                        async for chunk in response.aiter_bytes():
+                            yield chunk
+            
+            return StreamingResponse(
+                stream_anthropic_response(),
+                media_type="text/event-stream"
+            )
+        else:
+            try:
+                # Make a synchronous request to Anthropic API
+                async with httpx.AsyncClient() as client:
+                    response = await client.post(
+                        ANTHROPIC_API_URL,
+                        json=anthropic_request,
+                        headers=anthropic_headers,
+                        timeout=60
+                    )
+                
+                if response.status_code != 200:
+                    logger.error(f"Error from Anthropic API: {response.text}")
+                    return JSONResponse(
+                        status_code=response.status_code,
+                        content={"error": f"Anthropic API error: {response.text}"}
+                    )
+                    
+                # Simply return the Anthropic response directly
+                return response.json()
+            
+    except Exception as e:
+        logger.error(f"Error in brainstorm endpoint: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return JSONResponse(
+            status_code=500,
+            content={"error": f"Error processing brainstorm request: {str(e)}"}
+        )
+
 @app.get("/")
 async def root():
     return {"message": "Anthropic Proxy for Deepseek and Gemini using LiteLLM"}
@@ -1551,6 +1745,33 @@ def log_request_beautifully(method, path, claude_model, deepseek_model, num_mess
     print(model_line)
     sys.stdout.flush()
 
+def print_ascii_logo():
+    """Display ASCII art logo on startup."""
+    BLUE = "\033[34m"
+    CYAN = "\033[36m"
+    RESET = "\033[0m"
+    BOLD = "\033[1m"
+    
+    logo = f"""{BLUE}{BOLD}
+████████╗███████╗███████╗██████╗ ███████╗███████╗███████╗██╗  ██╗
+██╔═══██╗██╔════╝██╔════╝██╔══██╗██╔════╝██╔════╝██╔════╝██║ ██╔╝
+██║   ██║█████╗  █████╗  ██████╔╝███████╗█████╗  █████╗  █████╔╝ 
+██║   ██║██╔══╝  ██╔══╝  ██╔═══╝ ╚════██║██╔══╝  ██╔══╝  ██╔═██╗ 
+████████║███████╗███████╗██║     ███████║███████╗███████╗██║  ██╗
+╚═══════╝╚══════╝╚══════╝╚═╝     ╚══════╝╚══════╝╚══════╝╚═╝  ╚═╝
+
+{CYAN} ██████╗ ██████╗ ██████╗ ███████╗
+██╔════╝██╔═══██╗██╔══██╗██╔════╝
+██║     ██║   ██║██║  ██║█████╗  
+██║     ██║   ██║██║  ██║██╔══╝  
+╚██████╗╚██████╔╝██████╔╝███████╗
+ ╚═════╝ ╚═════╝ ╚═════╝ ╚══════╝{RESET}
+    """
+    print(logo)
+    print(f"{BOLD}Proxy server for Claude Code with Deepseek and Gemini models {CYAN}(unofficial){RESET}")
+    print(f"Run with: {CYAN}ANTHROPIC_BASE_URL=http://127.0.0.1:8082 claude{RESET}")
+    print()
+
 if __name__ == "__main__":
     import sys
     if len(sys.argv) > 1 and sys.argv[1] == "--help":
@@ -1558,6 +1779,18 @@ if __name__ == "__main__":
         print("Optional arguments:")
         print("  --always-cot    Always add Chain-of-Thought system prompt for Sonnet models")
         sys.exit(0)
+    
+    # Display ASCII logo
+    print_ascii_logo()
+    
+    # Print status info
+    print(f"Starting server on http://0.0.0.0:8082")
+    print(f"Chain-of-Thought mode: {'ENABLED' if ALWAYS_COT else 'DISABLED (use --always-cot to enable)'}")
+    print(f"Mapping: Claude Haiku → {SMALL_MODEL}, Claude Sonnet → {BIG_MODEL}")
+    print(f"Debug logging: {'ENABLED' if DEBUG_MODE else 'DISABLED (set DEBUG=true to enable)'}")
+    anthropic_key_status = "AVAILABLE" if ANTHROPIC_API_KEY else "NOT AVAILABLE (required for /brainstorm)"
+    print(f"Custom commands: /brainstorm (uses Claude 3.7, Anthropic API key: {anthropic_key_status})")
+    print(f"Ready to process requests...\n")
     
     # Configure uvicorn to run with minimal logs
     uvicorn.run(app, host="0.0.0.0", port=8082, log_level="error")
