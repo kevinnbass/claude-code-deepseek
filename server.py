@@ -621,7 +621,10 @@ def convert_anthropic_to_litellm(anthropic_request: MessagesRequest) -> Dict[str
         openai_tools = []
         for tool in anthropic_request.tools:
             # Convert to dict if it's a pydantic model
-            if hasattr(tool, 'dict'):
+            if hasattr(tool, 'model_dump'):
+                tool_dict = tool.model_dump()
+            elif hasattr(tool, 'dict'):
+                # For backward compatibility with older Pydantic
                 tool_dict = tool.dict()
             else:
                 tool_dict = tool
@@ -641,7 +644,10 @@ def convert_anthropic_to_litellm(anthropic_request: MessagesRequest) -> Dict[str
     
     # Convert tool_choice to OpenAI format if present
     if anthropic_request.tool_choice:
-        if hasattr(anthropic_request.tool_choice, 'dict'):
+        if hasattr(anthropic_request.tool_choice, 'model_dump'):
+            tool_choice_dict = anthropic_request.tool_choice.model_dump()
+        elif hasattr(anthropic_request.tool_choice, 'dict'):
+            # For backward compatibility with older Pydantic
             tool_choice_dict = anthropic_request.tool_choice.dict()
         else:
             tool_choice_dict = anthropic_request.tool_choice

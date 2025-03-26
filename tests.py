@@ -228,7 +228,9 @@ REQUIRED_EVENT_TYPES = {
 def get_response(url, headers, data):
     """Send a request and get the response."""
     start_time = time.time()
-    response = httpx.post(url, headers=headers, json=data, timeout=30)
+    # Use a longer timeout for Sonnet/reasoning tests
+    timeout_val = 60 if "sonnet" in data.get("model", "").lower() else 30
+    response = httpx.post(url, headers=headers, json=data, timeout=timeout_val)
     elapsed = time.time() - start_time
     
     print(f"Response time: {elapsed:.2f} seconds")
@@ -484,7 +486,9 @@ async def stream_response(url, headers, data, stream_name):
             request_data["stream"] = True
             
             start_time = time.time()
-            async with client.stream("POST", url, json=request_data, headers=headers, timeout=30) as response:
+            # Use a longer timeout for Sonnet/reasoning tests
+            timeout_val = 60 if "sonnet" in request_data.get("model", "").lower() else 30
+            async with client.stream("POST", url, json=request_data, headers=headers, timeout=timeout_val) as response:
                 if response.status_code != 200:
                     error_text = await response.aread()
                     stats.has_error = True
