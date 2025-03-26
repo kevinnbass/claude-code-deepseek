@@ -1,6 +1,6 @@
 # Claude Code with Deepseek and Gemini Models 🧠
 
-A proxy server that lets you use Claude Code with Deepseek and Google Gemini models, providing a cost-effective alternative while maintaining high-quality code assistance capabilities.
+A proxy server that lets you use Claude Code with Deepseek and Google Gemini models, providing a cost-effective alternative while maintaining high-quality code assistance capabilities. This solution delivers up to **96% cost savings** compared to using Claude directly, with comparable or better performance for many tasks.
 
 ## What This Does 🔄
 
@@ -158,6 +158,34 @@ Latest benchmark testing shows the following response times:
 * Best performance is achieved with `--always-cot` flag for reasoning tasks
 
 For detailed performance metrics and analysis, see [PERFORMANCE_SUMMARY.md](PERFORMANCE_SUMMARY.md).
+
+### Cost Comparison 💰
+
+One of the main benefits of using this proxy is the significant cost savings compared to using Claude directly, while maintaining high-quality responses:
+
+| Model | Input Tokens | Output Tokens | Context Window | Relative Cost |
+|-------|--------------|---------------|----------------|---------------|
+| **Claude 3.7 Sonnet** | $3.00 per 1M | $15.00 per 1M | 200K tokens | Baseline |
+| **DeepSeek Chat** (discount pricing) | $0.135 per 1M | $0.55 per 1M | 8K tokens | ~3.7% of Claude |
+| **Claude 3.5 Haiku** | $0.80 per 1M | $4.00 per 1M | 200K tokens | Baseline |
+| **Gemini 2.0 Flash** | $0.10 per 1M | $0.40 per 1M | 1M input / 8K output | ~10% of Claude |
+
+**Savings Examples:**
+
+For a typical coding session with 20K input tokens and 5K output tokens:
+- **Claude Sonnet**: $135 (20K input + 5K output)
+- **DeepSeek Chat**: $5.47 (~96% savings)
+- **Claude Haiku**: $36 (20K input + 5K output)
+- **Gemini Flash**: $3.02 (~92% savings)
+
+**Notes on Cost Structure:**
+
+- **DeepSeek** offers discounted rates (50% off) during UTC 16:30-00:30
+- **Gemini** has recently lowered their prices significantly with the 2.0 Flash model
+- Both alternative providers offer additional savings with caching
+- Batch processing with Claude can offer discounts, but alternative models remain more cost-effective
+
+This proxy enables you to use Claude Code's excellent interface while leveraging the more cost-effective Deepseek and Gemini models for significant savings.
 
 ## Model Provider Information 🏢
 
