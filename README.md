@@ -2,6 +2,8 @@
 
 A proxy server that lets you use Claude Code with Deepseek and Google Gemini models, providing a cost-effective alternative while maintaining high-quality code assistance capabilities. This solution delivers up to **96% cost savings** compared to using Claude directly, with comparable or better performance for many tasks.
 
+![DEEPSEEK CODE banner](https://raw.githubusercontent.com/kevinnbass/claude-code-deepseek/main/assets/banner.png)
+
 ## What This Does 🔄
 
 This proxy acts as a bridge between the Claude Code client and alternative AI models:
@@ -13,6 +15,14 @@ This proxy acts as a bridge between the Claude Code client and alternative AI mo
 5. Returns them to the Claude Code client
 
 The result: You can use Claude Code's excellent interface while leveraging more affordable Deepseek and Gemini models.
+
+### Key Benefits 💰
+
+- **Massive Cost Savings**: Use Claude Code with up to 96% lower costs
+- **Similar Performance**: Comparable response quality for code tasks
+- **Transparency**: Use the same Claude Code interface without changing your workflow
+- **Flexibility**: Choose which models to use for different types of tasks
+- **Customizability**: Added features not available in Claude Code by default
 
 ### New Feature: Custom Commands 🌟
 
@@ -38,24 +48,34 @@ This proxy extends Claude Code with custom slash commands for specialized tasks:
    ```
 
 2. **Install Python dependencies**:
+   Using pip:
    ```bash
    pip install -e .
    ```
-   Or with UV (recommended):
+   
+   Or using UV (recommended for faster installation):
    ```bash
    curl -LsSf https://astral.sh/uv/install.sh | sh
    uv pip install -e .
    ```
 
 3. **Configure your API keys**:
-   Create a `.env` file with:
+   Copy the example environment file:
+   ```bash
+   cp .env.example .env
+   ```
+   
+   Then edit the `.env` file with your API keys:
    ```
    # Required: At least one of these is needed
-   DEEPSEEK_API_KEY=your-deepseek-key
-   GEMINI_API_KEY=your-gemini-key
+   DEEPSEEK_API_KEY=your-deepseek-key  # Get from https://platform.deepseek.com
+   GEMINI_API_KEY=your-gemini-key      # Get from https://ai.google.dev/
    
    # Optional: Only needed for /brainstorm command
-   ANTHROPIC_API_KEY=your-anthropic-key
+   ANTHROPIC_API_KEY=your-anthropic-key  # Get from https://console.anthropic.com
+   
+   # Uncomment to enable debug logging
+   # DEBUG=true
    ```
 
 4. **Start the proxy server**:
@@ -68,35 +88,73 @@ This proxy extends Claude Code with custom slash commands for specialized tasks:
    uv run server.py --always-cot
    ```
 
-   The `--always-cot` flag is recommended as it significantly improves reasoning capability by adding Chain-of-Thought prompting for all Sonnet model requests. When the server starts, you'll see a colorful ASCII art display and information about the server configuration.
+   The server will display a colorful ASCII art logo and information about its configuration:
+   
+   ```
+   ████████╗███████╗███████╗██████╗ ███████╗███████╗███████╗██╗  ██╗
+   ██╔═══██╗██╔════╝██╔════╝██╔══██╗██╔════╝██╔════╝██╔════╝██║ ██╔╝
+   ██║   ██║█████╗  █████╗  ██████╔╝███████╗█████╗  █████╗  █████╔╝ 
+   ██║   ██║██╔══╝  ██╔══╝  ██╔═══╝ ╚════██║██╔══╝  ██╔══╝  ██╔═██╗ 
+   ████████║███████╗███████╗██║     ███████║███████╗███████╗██║  ██╗
+   ╚═══════╝╚══════╝╚══════╝╚═╝     ╚══════╝╚══════╝╚══════╝╚═╝  ╚═╝
+
+    ██████╗ ██████╗ ██████╗ ███████╗
+   ██╔════╝██╔═══██╗██╔══██╗██╔════╝
+   ██║     ██║   ██║██║  ██║█████╗  
+   ██║     ██║   ██║██║  ██║██╔══╝  
+   ╚██████╗╚██████╔╝██████╔╝███████╗
+    ╚═════╝ ╚═════╝ ╚═════╝ ╚══════╝
+   ```
+
+   **Server Options:**
+   - `--always-cot`: Recommended flag that significantly improves reasoning capability by adding Chain-of-Thought prompting for all Sonnet model requests
+   - Debug mode can be enabled by setting `DEBUG=true` in your `.env` file
 
 ### Using with Claude Code 🖥️
 
-1. **Install Claude Code** (if you haven't already):
+1. **Install Claude Code CLI** (if you haven't already):
    ```bash
    npm install -g @anthropic-ai/claude-code
    ```
 
 2. **Connect to your proxy**:
+   In a new terminal window, run:
    ```bash
    ANTHROPIC_BASE_URL=http://127.0.0.1:8082 claude
    ```
    
-   Note: Using the IP address directly (127.0.0.1) instead of localhost can resolve connection issues.
+   **Tip**: Using the IP address directly (127.0.0.1) instead of localhost can resolve connection issues.
 
-3. **Start coding!** 👨‍💻👩‍💻 Your Claude Code client will now use alternative models through the proxy.
+3. **Verify proxy connection**:
+   When Claude Code starts, you should see:
+   - Standard Claude Code welcome message
+   - No errors about connection issues
+   - Commands should work as expected
+
+4. **Try custom commands**:
+   Test that the `/brainstorm` command works by typing:
+   ```
+   /brainstorm How could I refactor a complex legacy codebase?
+   ```
+   
+   You should see a comprehensive, structured response with multiple approaches.
+
+5. **Start using it!** 👨‍💻👩‍💻
+   Your Claude Code client is now connected to cost-effective alternative models through the proxy, while maintaining the same interface and user experience.
 
 ### Custom Commands 🤖
 
-This proxy extends Claude Code with additional features:
+This proxy extends Claude Code with powerful custom commands:
 
 #### `/brainstorm` Command
 
-Generate creative ideas for any topic or problem:
+Generate creative ideas for any code challenge or problem:
 
 ```
 /brainstorm How can I optimize CI/CD pipelines for our microservices architecture?
 ```
+
+![Brainstorm Command Example](https://raw.githubusercontent.com/kevinnbass/claude-code-deepseek/main/assets/brainstorm-example.png)
 
 The `/brainstorm` command:
 - Uses a specialized system prompt tailored for code-related brainstorming
@@ -105,7 +163,32 @@ The `/brainstorm` command:
 - Includes tradeoffs and considerations for each solution
 - Perfect for architecture decisions, code optimization, and solving complex technical challenges
 
+**When to use `/brainstorm`:**
+- When you need deep, creative thinking about complex code problems
+- For architectural decisions that require multiple perspectives
+- When generating alternative approaches to implementation
+- For team planning sessions where multiple viable options are needed
+- When quality of ideas is more important than response speed
+
+**Example use cases:**
+- API design strategies
+- Database schema optimization
+- Refactoring approaches
+- Testing strategies
+- Performance optimization techniques
+- Error handling patterns
+
 Note: The `/brainstorm` command is the only feature that uses the actual Anthropic API; all other interactions still use the cost-saving Deepseek/Gemini models.
+
+#### Future Custom Commands
+
+The extensible architecture allows for easy addition of new custom commands:
+
+- `/debug` - Step-by-step debugging assistance (planned)
+- `/refactor` - Code refactoring suggestions (planned)
+- `/perf` - Performance optimization strategies (planned)
+
+Contributions of new commands are welcome!
 
 ## Features 🌟
 
@@ -190,7 +273,7 @@ python run_tests.py --all --proxy-only
 python run_tests.py --all --anthropic-key=your-api-key
 ```
 
-Test results and performance comparisons are saved to the `tests/test_results/` directory.
+Test results and performance comparisons are saved to the `tests/results/` directory.
 
 ### Project Structure
 
@@ -210,7 +293,7 @@ claude-code-deepseek/
 │   ├── run_tests.py          # Package test runner
 │   ├── simple_comparison.py  # Simple performance comparison
 │   ├── backups/              # Original test file backups 
-│   └── test_results/         # Test output directory
+│   └── results/              # Test output directory
 ```
 
 The codebase is organized for maintainability with separated concerns:
@@ -292,19 +375,49 @@ This proxy enables you to use Claude Code's excellent interface while leveraging
 
 ## Technical Details 🔧
 
-- Uses [LiteLLM](https://github.com/BerriAI/litellm) for model API standardization
-- Handles both streaming and non-streaming responses
-- Implements proper error handling and graceful fallbacks
-- Manages content blocks and tool usage conversions between different API formats
+### Architecture
+
+This proxy provides a transparent bridge between Claude Code and alternative AI models:
+
+- **API Compatibility Layer**: Implements Anthropic's API endpoints and response formats
+- **Model Routing Logic**: Routes requests to the appropriate provider based on model type
+- **Request/Response Transformation**: Converts between API formats with full compatibility
+- **Custom Command System**: Extends functionality with specialized commands
+- **Streaming Support**: Full compatibility with event streaming for real-time responses
+
+### Technologies
+
+- **[FastAPI](https://fastapi.tiangolo.com/)**: High-performance web framework for the proxy server
+- **[LiteLLM](https://github.com/BerriAI/litellm)**: Standardized interface to multiple LLM providers
+- **[HTTPX](https://www.python-httpx.org/)**: Modern HTTP client for async API communication
+- **[Python 3.9+](https://www.python.org/)**: Core language with robust async support
 
 ### How It Works
 
 1. The proxy receives requests from Claude Code in Anthropic's format
-2. It identifies whether the request is for a Haiku (→ Gemini) or Sonnet (→ Deepseek) model
-3. It transforms the request to the appropriate format for the target model
-4. For Sonnet models, it optionally adds Chain-of-Thought prompting (recommended with `--always-cot`)
-5. It processes the response from the target API and converts it back to Claude format
+2. It identifies request type:
+   - Normal model request: Routes to Deepseek/Gemini
+   - Custom command: Uses specialized handler (e.g., `/brainstorm` routes to Anthropic)
+3. It transforms the request format appropriately for the target API
+4. For Sonnet models, it optionally adds Chain-of-Thought prompting (with `--always-cot`)
+5. It processes the response and converts it back to Anthropic's format
 6. The Claude Code client receives responses in the expected format
+
+### Environment Configuration
+
+The proxy can be configured through environment variables:
+- `DEEPSEEK_API_KEY`: Your Deepseek API key
+- `GEMINI_API_KEY`: Your Google Gemini API key
+- `ANTHROPIC_API_KEY`: Optional, required only for `/brainstorm` command
+- `BIG_MODEL`: Model to use for Sonnet requests (default: `deepseek-chat`)
+- `SMALL_MODEL`: Model to use for Haiku requests (default: `gemini-2.0-flash`)
+- `DEBUG`: Set to `true` to enable debug logging
+
+### Server Command-Line Options
+
+The server accepts these command-line arguments:
+- `--always-cot`: Always add Chain-of-Thought system prompt for Sonnet models (recommended)
+- `--help`: Display help information
 
 ## Detailed Capabilities
 

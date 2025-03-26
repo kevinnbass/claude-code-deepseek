@@ -314,7 +314,7 @@ def save_results_to_file(results, filename="comparison_results.json", label=""):
         filename = f"{base}_{label}{ext}"
     
     # Ensure the results directory exists
-    results_dir = os.path.join(os.path.dirname(__file__), "test_results")
+    results_dir = os.path.join(os.path.dirname(__file__), "results")
     os.makedirs(results_dir, exist_ok=True)
     
     # Full path to the results file
@@ -378,7 +378,7 @@ async def main():
                 chart_file = f"{base}_{label}{ext}"
             
             # Ensure the results directory exists
-            results_dir = os.path.join(os.path.dirname(__file__), "test_results")
+            results_dir = os.path.join(os.path.dirname(__file__), "results")
             os.makedirs(results_dir, exist_ok=True)
             
             # Full path to the chart file

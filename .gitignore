@@ -8,7 +8,7 @@ logs/
 *.log
 
 # Test artifacts
-tests/test_results/
+tests/results/
 tests/backups/
 comparison_*.json
 comparison_*.png
