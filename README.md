@@ -140,20 +140,24 @@ All core capabilities have been verified through comprehensive testing:
 
 Latest benchmark testing shows the following response times:
 
-| Task Type | Gemini Flash | Deepseek Chat | Claude (estimated) |
-|-----------|--------------|---------------|-------------------|
-| Simple text generation | 0.7-0.8s | - | ~1-2s |
-| Tool usage (calculator) | 0.6-0.7s | - | ~1-2s |
-| Multi-turn conversation | 0.5-0.6s | - | ~1-2s |
-| Complex reasoning | - | 16-17s | ~2-3s |
-| Code generation | - | 18-19s | ~3-4s |
-| Streaming responses | Real-time | Real-time | Real-time |
+| Task Type | Gemini Flash | Deepseek Chat | Claude (measured) | Performance Ratio |
+|-----------|--------------|---------------|-------------------|-----------------|
+| Simple text generation | 0.7-0.8s | - | 1.0-1.1s | 0.7x (faster) |
+| Tool usage (calculator) | 0.6-0.7s | - | ~1.0s | 0.65x (faster) |
+| Multi-turn conversation | 0.5-0.6s | - | ~1.0s | 0.6x (faster) |
+| Complex reasoning | - | 15-16s | ~7-8s | 2.0x (slower) |
+| Code generation | - | 15-20s | ~16s | 1.1x (similar) |
+| Streaming responses | Real-time | Real-time | Real-time | 1.0x (similar) |
 
 **Key observations:**
-* Gemini Flash is extremely fast for simple tasks and tool usage
-* Deepseek Chat provides high-quality outputs for complex tasks, though with longer latency
+* Gemini Flash is significantly faster than Claude Haiku for simple tasks
+* Deepseek Chat takes longer for complex reasoning but produces high-quality outputs
+* Code generation performance is comparable to Claude
+* Performance formula: Haiku tasks = 0.7x Claude time, Sonnet tasks = ~2.0x Claude time
 * All tests pass with 100% success rate in comprehensive testing
 * Best performance is achieved with `--always-cot` flag for reasoning tasks
+
+For detailed performance metrics and analysis, see [PERFORMANCE_SUMMARY.md](PERFORMANCE_SUMMARY.md).
 
 ## Model Provider Information 🏢
 

@@ -78,7 +78,7 @@ calculator_tool = {
 TEST_SCENARIOS = {
     # Simple text response
     "simple_text": {
-        "description": "Simple text response",
+        "description": "Simple text response (Haiku/Gemini)",
         "model": "claude-3-haiku-20240307",
         "max_tokens": 300,
         "messages": [
@@ -88,7 +88,7 @@ TEST_SCENARIOS = {
     
     # Tool usage
     "tool_usage": {
-        "description": "Calculator tool usage",
+        "description": "Calculator tool usage (Haiku/Gemini)",
         "model": "claude-3-haiku-20240307",
         "max_tokens": 300,
         "messages": [
@@ -98,21 +98,9 @@ TEST_SCENARIOS = {
         "tool_choice": {"type": "auto"}
     },
     
-    # Multi-turn conversation
-    "multi_turn": {
-        "description": "Multi-turn conversation",
-        "model": "claude-3-haiku-20240307",
-        "max_tokens": 500,
-        "messages": [
-            {"role": "user", "content": "Let's do some math. What is 240 divided by 8?"},
-            {"role": "assistant", "content": "To calculate 240 divided by 8, I'll perform the division:\n\n240 ÷ 8 = 30\n\nSo the result is 30."},
-            {"role": "user", "content": "Now multiply that by 4 and tell me the result."}
-        ]
-    },
-    
     # Complex reasoning
     "complex_reasoning": {
-        "description": "Complex mathematical reasoning",
+        "description": "Complex reasoning (Sonnet/Deepseek)",
         "model": "claude-3-sonnet-20240229",
         "max_tokens": 1000,
         "messages": [
@@ -122,7 +110,7 @@ TEST_SCENARIOS = {
     
     # Code generation
     "code_generation": {
-        "description": "Python code generation",
+        "description": "Python code generation (Sonnet/Deepseek)",
         "model": "claude-3-sonnet-20240229",
         "max_tokens": 1000,
         "messages": [
@@ -398,7 +386,7 @@ def print_comparison_table(results: ComparisonResults):
     print(f"\nTotal Duration: {summary['duration_seconds']:.2f} seconds")
     print(f"Success Rate: {summary['success_rate']}% ({summary['passed_tests']}/{summary['total_tests']} tests passed)")
 
-def save_results_to_file(results: ComparisonResults, filename: str = "comparison_results.json"):
+def save_results_to_file(results: ComparisonResults, filename: str = "comparison_results.json", label: str = ""):
     """Save test results to a JSON file."""
     # Prepare data for serialization
     data = {
@@ -406,6 +394,11 @@ def save_results_to_file(results: ComparisonResults, filename: str = "comparison
         "results": [r.to_dict() for r in results.results],
         "timestamp": datetime.now().isoformat()
     }
+    
+    # Apply label to filename if provided
+    if label:
+        base, ext = os.path.splitext(filename)
+        filename = f"{base}_{label}{ext}"
     
     # Write to file
     with open(filename, "w") as f:
@@ -420,6 +413,7 @@ async def main():
     parser.add_argument("--proxy-only", action="store_true", help="Only test against the proxy")
     parser.add_argument("--anthropic-only", action="store_true", help="Only test against Anthropic API")
     parser.add_argument("--iterations", type=int, default=1, help="Number of iterations for each test")
+    parser.add_argument("--label", type=str, help="Label to add to output files")
     args = parser.parse_args()
     
     # Override API key if provided as argument
@@ -455,12 +449,18 @@ async def main():
         # Print results
         print_comparison_table(results)
         
-        # Save results
-        save_results_to_file(results)
+        # Save results with label if provided
+        label = ""
+        if args.label:
+            label = args.label
+        save_results_to_file(results, label=label)
         
         # Generate chart if both APIs were tested
         if not args.proxy_only and not args.anthropic_only:
             chart_file = "comparison_chart.png"
+            if label:
+                base, ext = os.path.splitext(chart_file)
+                chart_file = f"{base}_{label}{ext}"
             with open(chart_file, "wb") as f:
                 f.write(results.generate_chart().getvalue())
             print(f"Comparison chart saved to {chart_file}")
