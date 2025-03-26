@@ -1662,26 +1662,25 @@ async def brainstorm(
                 media_type="text/event-stream"
             )
         else:
-            try:
-                # Make a synchronous request to Anthropic API
-                async with httpx.AsyncClient() as client:
-                    response = await client.post(
-                        ANTHROPIC_API_URL,
-                        json=anthropic_request,
-                        headers=anthropic_headers,
-                        timeout=60
-                    )
-                
-                if response.status_code != 200:
-                    logger.error(f"Error from Anthropic API: {response.text}")
-                    return JSONResponse(
-                        status_code=response.status_code,
-                        content={"error": f"Anthropic API error: {response.text}"}
-                    )
-                    
-                # Simply return the Anthropic response directly
-                return response.json()
+            # Make a synchronous request to Anthropic API
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    ANTHROPIC_API_URL,
+                    json=anthropic_request,
+                    headers=anthropic_headers,
+                    timeout=60
+                )
             
+            if response.status_code != 200:
+                logger.error(f"Error from Anthropic API: {response.text}")
+                return JSONResponse(
+                    status_code=response.status_code,
+                    content={"error": f"Anthropic API error: {response.text}"}
+                )
+                
+            # Simply return the Anthropic response directly
+            return response.json()
+    
     except Exception as e:
         logger.error(f"Error in brainstorm endpoint: {str(e)}")
         import traceback
