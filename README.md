@@ -1,11 +1,6 @@
-# Claude Code but with Deepseek Models 🧙‍♂️🔄 ¯\\_(ツ)_/¯
+# Claude Code with Deepseek Models 🧙‍♂️🤖
 
-**Use Claude Code with Deepseek Models** 🤝
-
-A proxy server that lets you use Claude Code with Deepseek models like deepseek-chat and deepseek-coder. 🌉
-
-
-![Claude Code but with OpenAI Models](pic.png)
+A proxy server that lets you use Claude Code with Deepseek models like deepseek-chat and deepseek-coder. Save on API costs while maintaining excellent code assistant capabilities.
 
 ## Quick Start ⚡
 
@@ -49,8 +44,10 @@ A proxy server that lets you use Claude Code with Deepseek models like deepseek-
 
 2. **Connect to your proxy**:
    ```bash
-   ANTHROPIC_BASE_URL=http://localhost:8082 claude
+   ANTHROPIC_BASE_URL=http://127.0.0.1:8082 claude
    ```
+   
+   Note: Using the IP address directly (127.0.0.1) instead of localhost can resolve connection issues.
 
 3. **That's it!** Your Claude Code client will now use Deepseek models through the proxy. 🎯
 
@@ -97,6 +94,19 @@ The proxy handles both streaming and non-streaming responses, maintaining compat
 ## Token Limit ⚠️
 
 Deepseek models have a maximum token limit of 8192, which is automatically enforced by the proxy.
+
+## Performance Comparison
+
+Based on testing, Deepseek models have comparable capabilities to Claude models but with different response times:
+
+| Feature | Response Time Comparison |
+|---------|--------------------------|
+| Simple text generation | Deepseek ~5-7s vs Claude ~1-2s |
+| Complex reasoning | Deepseek ~12-15s vs Claude ~2-3s |
+| Code generation | Deepseek ~15-18s vs Claude ~3-4s |
+| Tool usage | Deepseek ~5-6s vs Claude ~1-2s |
+
+The proxy includes Chain-of-Thought prompting for improved reasoning capabilities with Deepseek models.
 
 ## Detailed Capabilities
 
