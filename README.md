@@ -2,8 +2,6 @@
 
 A proxy server that lets you use Claude Code with Deepseek and Google Gemini models, providing a cost-effective alternative while maintaining high-quality code assistance capabilities. This solution delivers up to **96% cost savings** compared to using Claude directly, with comparable or better performance for many tasks.
 
-**✨ SPECIAL FEATURE: `/brainstorm` command connects directly to Claude 3.7 Sonnet for exceptional brainstorming quality! ✨**
-
 ![DEEPSEEK CODE banner](https://raw.githubusercontent.com/kevinnbass/claude-code-deepseek/main/assets/banner.png)
 
 ## What This Does 🔄
@@ -26,12 +24,6 @@ The result: You can use Claude Code's excellent interface while leveraging more 
 - **Transparency**: Use the same Claude Code interface without changing your workflow
 - **Flexibility**: Choose which models to use for different types of tasks
 - **Customizability**: Added features not available in Claude Code by default
-
-### New Feature: Custom Commands 🌟
-
-This proxy extends Claude Code with custom slash commands for specialized tasks:
-
-- **`/brainstorm`** - A special command that connects directly to Claude 3.7 Sonnet for high-quality code brainstorming (requires Anthropic API key)
 
 ## Quick Start ⚡
 
@@ -95,40 +87,9 @@ This proxy extends Claude Code with custom slash commands for specialized tasks:
 
 3. **Verify proxy connection**: You should see the standard Claude Code welcome message with no errors.
 
-4. **Try custom commands**: Test the `/brainstorm` command
-   ```
-   /brainstorm How could I refactor a complex legacy codebase?
-   ```
-
-5. **Start using it!** Your Claude Code client is now connected to cost-effective alternative models.
+4. **Start using it!** Your Claude Code client is now connected to cost-effective alternative models.
 
 ## Features 🌟
-
-### Custom Commands 🤖
-
-#### `/brainstorm` Command
-
-Generate creative ideas for any code challenge or problem:
-
-```
-/brainstorm How can I optimize CI/CD pipelines for our microservices architecture?
-```
-
-![Brainstorm Command Example](https://raw.githubusercontent.com/kevinnbass/claude-code-deepseek/main/assets/brainstorm-example.png)
-
-The `/brainstorm` command:
-- Uses a specialized system prompt tailored for code-related brainstorming
-- **Connects directly to Claude 3.7 Sonnet** (requires ANTHROPIC_API_KEY)
-- Generates diverse, actionable ideas with implementation details and code snippets
-- Includes tradeoffs and considerations for each solution
-
-**When to use**: Architecture decisions, code optimization, refactoring approaches, testing strategies, and when quality of ideas is more important than response speed.
-
-**Example use cases:** API design, database optimization, refactoring approaches, testing strategies, performance optimization, and error handling patterns.
-
-Note: The `/brainstorm` command is the only feature that uses the Anthropic API; all other interactions use the cost-saving models.
-
-Future planned commands include `/debug`, `/refactor`, and `/perf`. Contributions welcome!
 
 ### Model Mapping 🗺️
 
@@ -216,6 +177,32 @@ For a typical coding session (20K input, 5K output tokens):
 4. For Sonnet models, it optionally adds Chain-of-Thought prompting
 5. It processes the response and converts it back to Anthropic's format
 6. The Claude Code client receives responses in the expected format
+
+### Special Feature: `/brainstorm` Command ✨
+
+This proxy extends Claude Code with custom slash commands for specialized tasks. The most powerful is the `/brainstorm` command that connects directly to Claude 3.7 Sonnet for exceptional brainstorming quality.
+
+Generate creative ideas for any code challenge or problem:
+
+```
+/brainstorm How can I optimize CI/CD pipelines for our microservices architecture?
+```
+
+![Brainstorm Command Example](https://raw.githubusercontent.com/kevinnbass/claude-code-deepseek/main/assets/brainstorm-example.png)
+
+The `/brainstorm` command:
+- Uses a specialized system prompt tailored for code-related brainstorming
+- **Connects directly to Claude 3.7 Sonnet** (requires ANTHROPIC_API_KEY)
+- Generates diverse, actionable ideas with implementation details and code snippets
+- Includes tradeoffs and considerations for each solution
+
+**When to use**: Architecture decisions, code optimization, refactoring approaches, testing strategies, and when quality of ideas is more important than response speed.
+
+**Example use cases:** API design, database optimization, refactoring approaches, testing strategies, performance optimization, and error handling patterns.
+
+Note: The `/brainstorm` command is the only feature that uses the Anthropic API; all other interactions use the cost-saving models.
+
+Future planned commands include `/debug`, `/refactor`, and `/perf`. Contributions welcome!
 
 For a comprehensive comparison between Claude and alternative model capabilities, see [CAPABILITIES.md](CAPABILITIES.md).
 For detailed performance metrics and analysis, see [PERFORMANCE_SUMMARY.md](PERFORMANCE_SUMMARY.md).
