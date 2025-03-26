@@ -34,6 +34,7 @@ load_dotenv()
 # Configuration
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
 DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 PROXY_API_KEY = os.environ.get("ANTHROPIC_API_KEY")  # Using same key for proxy as would be used with Claude
 
 # URLs
@@ -42,8 +43,8 @@ PROXY_API_URL = "http://localhost:8082/v1/messages"
 ANTHROPIC_VERSION = "2023-06-01"
 
 # Model configuration
-CLAUDE_MODEL = "claude-3-sonnet-20240229"  # Used for direct Anthropic API tests
-PROXY_MODEL = "claude-3-sonnet-20240229"   # Will be mapped to deepseek-chat by the proxy
+CLAUDE_MODEL = "claude-3-haiku-20240307"  # Used for direct Anthropic API tests
+PROXY_MODEL = "claude-3-haiku-20240307"   # Will be mapped to gemini-2.0-flash by the proxy
 
 # Headers
 anthropic_headers = {
@@ -172,7 +173,7 @@ TEST_SCENARIOS = {
     
     # Chain of Thought test
     "cot_reasoning": {
-        "model": PROXY_MODEL,
+        "model": "claude-3-sonnet-20240229",  # Using Sonnet for reasoning task (maps to deepseek-chat)
         "max_tokens": 1000,
         "system": "You are a helpful assistant that uses chain-of-thought reasoning. For complex questions, always break down your reasoning step-by-step before giving an answer.",
         "messages": [
@@ -182,7 +183,7 @@ TEST_SCENARIOS = {
     
     # Code generation test 
     "code_generation": {
-        "model": PROXY_MODEL,
+        "model": "claude-3-sonnet-20240229",  # Using Sonnet for code tasks (maps to deepseek-chat)
         "max_tokens": 1000,
         "messages": [
             {"role": "user", "content": "Write a Python function to check if a string is a palindrome."}
@@ -806,14 +807,14 @@ async def run_tests(args):
 
 async def main():
     # Check API key configuration
-    if not ANTHROPIC_API_KEY and not DEEPSEEK_API_KEY:
-        print("Error: Neither ANTHROPIC_API_KEY nor DEEPSEEK_API_KEY set in .env file")
-        print("At least DEEPSEEK_API_KEY is required for proxy functionality")
+    if not ANTHROPIC_API_KEY and not (DEEPSEEK_API_KEY or GEMINI_API_KEY):
+        print("Error: Required API keys not set in .env file")
+        print("At least one of DEEPSEEK_API_KEY or GEMINI_API_KEY is required for proxy functionality")
         return
     
     # Parse command-line arguments
     parser = argparse.ArgumentParser(
-        description="Test the Claude-on-Deepseek proxy using the deepseek-chat model"
+        description="Test the proxy using Deepseek and Gemini models with Claude Code"
     )
     parser.add_argument("--no-streaming", action="store_true", help="Skip streaming tests")
     parser.add_argument("--streaming-only", action="store_true", help="Only run streaming tests")

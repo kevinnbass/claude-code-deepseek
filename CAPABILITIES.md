@@ -1,48 +1,59 @@
-# Claude to Deepseek Capability Mapping
+# Claude to Alternative Models Capability Mapping
 
-This document provides a reference for how Claude models and capabilities map to their Deepseek equivalents when using the proxy.
+This document provides a reference for how Claude models and capabilities map to their Deepseek and Gemini equivalents when using the proxy.
 
 ## Model Mapping
 
-| Claude Capability | Deepseek Equivalent | Notes |
-|-------------------|---------------------|-------|
-| **Core Models** | | |
-| Claude Haiku | deepseek-chat | General purpose chat model, default for smaller tasks |
-| Claude Sonnet | deepseek-chat | General purpose chat model, default for complex tasks |
-| Claude Opus | Not directly mapped | No direct equivalent in current Deepseek lineup |
-| **Specialized Tasks** | | |
-| Code generation | deepseek-chat | Use standard deepseek-chat for all coding tasks |
-| Reasoning | deepseek-chat + CoT prompt | Use with Chain-of-Thought system prompt for complex reasoning |
-| **Technical Capabilities** | | |
-| Function calling/Tool use | Supported | Based on OpenAI-compatible function calling format |
-| Streaming responses | Supported | Server-sent events (SSE) format for streaming |
-| System prompts | Supported | As first message in conversation |
-| Context window | 8192 tokens | Smaller than Claude Sonnet (200K) and Opus (1M) |
-| JSON mode | Unknown | No specific information found |
-| Multi-turn conversations | Supported | Standard chat format with role-based messages |
-| **Integration** | | |
-| API format | OpenAI-compatible | Uses similar format to OpenAI, works with LiteLLM |
-| Base URL | https://api.deepseek.com | Default API endpoint |
-| API parameters | OpenAI-compatible | Temperature, top_p, top_k, similar to OpenAI/Claude |
-| **Content Types** | | |
-| Text generation | Supported | Core capability |
-| Code generation | Supported | Use standard deepseek-chat for all coding tasks |
-| Image understanding | Unknown | No clear documentation on multimodal capabilities |
-| **Developer Tools** | | |
-| ChatUI | Multiple options | Many integrations like Cursor, 16x Prompt |
-| SDK/Tools | LiteLLM, YoMo | Support for function calling frameworks |
+| Claude Capability | Alternative Equivalent | Provider | Notes |
+|-------------------|------------------------|----------|-------|
+| **Core Models** | | | |
+| Claude Haiku | gemini-2.0-flash | Google | Default for simpler tasks and quick responses |
+| Claude Sonnet | deepseek-chat | Deepseek | Default for complex tasks and code generation |
+| Claude Opus | Not directly mapped | - | No direct equivalent in current lineup |
+| **Specialized Tasks** | | | |
+| Code generation | deepseek-chat | Deepseek | Recommended for all coding tasks |
+| Reasoning | deepseek-chat + CoT prompt | Deepseek | Use with Chain-of-Thought system prompt for complex reasoning |
+| Quick answers | gemini-2.0-flash | Google | Efficient for simple factual responses |
+| **Technical Capabilities** | | | |
+| Function calling/Tool use | Supported by both | Both | Based on OpenAI-compatible function calling format |
+| Streaming responses | Supported by both | Both | Server-sent events (SSE) format for streaming |
+| System prompts | Supported by both | Both | As first message in conversation |
+| **Context Windows** | | | |
+| Deepseek | 8192 tokens | Deepseek | Smaller than Claude Sonnet (200K) and Opus (1M) |
+| Gemini | 1,048,576 input / 8,192 output | Google | Large input context but limited output tokens |
+| **Integration** | | | |
+| API format | OpenAI-compatible | Both | Similar format to OpenAI, works with LiteLLM |
+| Base URLs | https://api.deepseek.com | Deepseek | Default API endpoints |
+| | https://generativelanguage.googleapis.com | Google | |
+| API parameters | OpenAI-compatible | Both | Temperature, top_p, top_k, similar to OpenAI/Claude |
+| **Content Types** | | | |
+| Text generation | Supported by both | Both | Core capability |
+| Code generation | Supported by both | Both | Strong in Deepseek models |
+| Image understanding | Supported | Google | Gemini has strong multimodal capabilities |
+| **Developer Tools** | | | |
+| Integration | LiteLLM | Both | Common integration framework |
+| Utilities | Function calling frameworks | Both | Support for structured tool use |
 
 ## Key Considerations
 
-When using Deepseek models with Claude Code through this proxy:
+When using alternative models with Claude Code through this proxy:
 
-1. **Token Limit**: Deepseek models have a significantly smaller context window (8192 tokens) compared to Claude models (200K for Sonnet, 1M for Opus)
+1. **Model Selection**: 
+   - **Haiku models** map to `gemini-2.0-flash` (general tasks, quick responses)
+   - **Sonnet models** map to `deepseek-chat` + optional Chain-of-Thought (CoT) system prompt (optimal for reasoning and coding tasks)
 
-2. **Model Selection**: 
-   - **Haiku models** map to `deepseek-chat` (general tasks)
-   - **Sonnet models** map to `deepseek-chat` + automatic Chain-of-Thought (CoT) system prompt (optimal for reasoning tasks)
-   - All coding tasks use `deepseek-chat` regardless of the selected model
+2. **Token Limits**: 
+   - Both models have output token limits of 8192 (compared to Claude's much larger limits)
+   - Gemini models have a large input context window (over 1M tokens)
 
-3. **Function Calling**: Deepseek supports function calling in an OpenAI-compatible format
+3. **Function Calling**: 
+   - Both models support function calling in an OpenAI-compatible format
+   - Implementation details vary slightly between providers
 
-4. **Performance**: Consider experimenting with different models for your specific use case to find the optimal balance between performance and capability
+4. **Performance**: 
+   - Response times are generally slower than native Claude models
+   - Consider experimenting with different models for your specific use case
+
+5. **Customization**:
+   - You can override default mapping through environment variables
+   - Setting `--always-cot` flag enhances reasoning for Sonnet-mapped models
