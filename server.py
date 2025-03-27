@@ -15,6 +15,7 @@ import re
 from datetime import datetime
 import sys
 import argparse
+import random
 
 # Define Anthropic API URL
 ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages"
@@ -98,11 +99,511 @@ app = FastAPI()
 # Get API keys from environment
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
 DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY")
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+
+# Gemini API key rotation setup
+GEMINI_API_KEYS = [
+    "AIzaSyASaK9hy3DWBVcCeLjWgQ21w3EkFzg8Y3c",
+    "AIzaSyBq0MikUONa6Scus-n0kHI6hYZW606gpBw",
+    "AIzaSyDxQE5xjJP6Og-FNlVUk8qPx3C5MINasPw",
+    "AIzaSyAo1s8re6sofxGew941M7sppeeWqWCl7Nc",
+    "AIzaSyDHGlVxicUhTN_6jDbK6iBFCPrMU2tOsao",
+    "AIzaSyA4nhaky7RnA42biziWqUn2cTNTFJmaNy0",
+    "AIzaSyDg938DBcBgHtvmcc1DFpKi8COtHDn4RzU",
+    "AIzaSyAkY-cEWW5av3NGUdbH0eKuFBOwkPZfeAw",
+    "AIzaSyDRiwSqFCkCecPo-Kj18kHo2NDMXfuxHo4",
+    "AIzaSyAIA13wXUQnwUM-VHS3AlQ0ic8beAQn0F0",
+    "AIzaSyCoQFwl2uFe-wgGq7quxNBIO8HtrMhBygM",
+    "AIzaSyDaCfbee7IuJBen-X4nbrbHenUCNqO6c_o",
+    "AIzaSyDkxDNDbRBTMErnPUKKj-l5ONY8mHi16hg",
+    "AIzaSyDPYNTlVItzs42Ql9OM6ehqZ5ZeumOMUNI",
+    "AIzaSyAvxRnG_JQvtU6GYSUmKY0iHU6uNTSz-Yk",
+    "AIzaSyAUzOhJq0z8L6gZaAQuQVNv7hcK3XlWzPE",
+    "AIzaSyC4thWdG5LiUSbF_t8VevmQplYUcT9cV9g",
+    "AIzaSyDcmKZ6ONssXP1XsoRGVLrMVfckbGrzX7g",
+    "AIzaSyCQg155EkEpzFBErh2_LL4d39mjsAYvAZo",
+    "AIzaSyASv3CGdQsLyIwWqiV3M8ec9ALr6mPuGHM",
+    "AIzaSyD4aj2p2JOw2gnoUg0rNOVXBzsu-RTpcrA",
+    "AIzaSyAZtnfkXrSEb4Ij4Hp2uQrdzV08WQwc9p4",
+    "AIzaSyCSY4VBE3PuCtm_8sbJK9PCNOlORgbORCU",
+    "AIzaSyD8XARYd3OjwCEhDrJIPEwiUP31tLWdrwE",
+    "AIzaSyCDs3wH_Q6ADvMAISUO_KrKpqdD81qXXWY",
+    "AIzaSyAKdl6eP9EBq55UHo9e9VbGjBc92IREb1A",
+    "AIzaSyDJqG8UeoWaAHpITQGNv9kgaTTmB2HmcO0",
+    "AIzaSyAaapsepwXKhSiO5IiNza7skZfq84i9gAc",
+    "AIzaSyD7_FqyZJoltFAYkZ0HgI6HcnOX_3usffo",
+    "AIzaSyAfpqmbgL7HE9bBspGVVT7TLdEDsJplMgU"
+]
+
+# Randomly shuffle the initial order of API keys
+random.shuffle(GEMINI_API_KEYS)
+
+# Create a counter for key rotation and a variable for the current key
+gemini_key_counter = 0
+GEMINI_API_KEY = GEMINI_API_KEYS[gemini_key_counter]
+
+# Function to get the next API key in the rotation
+def get_next_gemini_api_key():
+    global gemini_key_counter, GEMINI_API_KEYS, GEMINI_API_KEY
+    
+    # Increment counter and wrap around if we reach the end of the list
+    gemini_key_counter += 1
+    
+    # If we've used all keys in the current cycle, shuffle for next cycle
+    if gemini_key_counter >= len(GEMINI_API_KEYS):
+        gemini_key_counter = 0
+        random.shuffle(GEMINI_API_KEYS)
+        logger.info(f"Completed a full cycle of Gemini API keys. Reshuffled keys for next cycle.")
+    
+    # Get the next key
+    GEMINI_API_KEY = GEMINI_API_KEYS[gemini_key_counter]
+    
+    # Log the rotation (only show first few characters of the key for security)
+    key_prefix = GEMINI_API_KEY[:8] + "..."
+    logger.info(f"Rotating to Gemini API key #{gemini_key_counter+1}/{len(GEMINI_API_KEYS)}: {key_prefix}")
+    
+    return GEMINI_API_KEY
+
+# Function to clean tool schemas for Gemini compatibility
+def clean_gemini_tools(tools):
+    """
+    Clean tool schemas to be compatible with Gemini API.
+    Removes fields like 'additionalProperties' that Gemini doesn't support.
+    
+    Gemini has several requirements that differ from OpenAI:
+    1. No additionalProperties field in schemas
+    2. Object types must have non-empty properties
+    3. Only 'enum' and 'date-time' formats are supported
+    4. Function declarations and parameters must be strictly formatted
+    """
+    if not tools:
+        return tools
+    
+    cleaned_tools = []
+    removed_fields = 0
+    
+    # Convert tools for Gemini's format - it expects function_declarations
+    # This transformation is done by litellm, but we still need to clean the schemas
+    for i, tool in enumerate(tools):
+        cleaned_tool = tool.copy() if isinstance(tool, dict) else tool
+        
+        # Clean function schema if present
+        if isinstance(cleaned_tool, dict) and "function" in cleaned_tool:
+            tool_name = cleaned_tool["function"].get("name", f"tool_{i}")
+            
+            # Special handling for problematic tools
+            if tool_name == "WebFetchTool":
+                logger.info(f"Applying special cleanup for WebFetchTool to fix URL format issues")
+                fixed_tool = fix_webfetch_tool(cleaned_tool)
+                cleaned_tool = fixed_tool
+            elif tool_name == "BatchTool":
+                logger.info(f"Applying special cleanup for BatchTool")
+                fixed_tool = fix_batch_tool(cleaned_tool)
+                cleaned_tool = fixed_tool
+            elif tool_name == "NotebookEditCell":
+                logger.info(f"Applying special cleanup for NotebookEditCell")
+                fixed_tool = fix_notebook_edit_cell_tool(cleaned_tool)
+                cleaned_tool = fixed_tool
+            
+            # Handle parameters schema
+            if "parameters" in cleaned_tool["function"]:
+                # Log the original schema for debugging
+                try:
+                    original_params = cleaned_tool["function"]["parameters"]
+                    logger.debug(f"Original schema for {tool_name} before cleaning: {json.dumps(original_params)[:300]}...")
+                except Exception as e:
+                    logger.debug(f"Could not serialize original schema for {tool_name}: {str(e)}")
+                
+                # Clean the schema recursively to handle nested objects
+                cleaned_parameters, fields_removed = deep_clean_schema(
+                    cleaned_tool["function"]["parameters"], 
+                    return_removed_count=True,
+                    tool_name=tool_name
+                )
+                cleaned_tool["function"]["parameters"] = cleaned_parameters
+                removed_fields += fields_removed
+                
+                # Post-cleaning validation - make sure schema conforms to Gemini's expectations
+                validate_and_fix_gemini_schema(cleaned_tool["function"], tool_name)
+                
+                # Log the cleaned schema for debugging
+                try:
+                    logger.info(f"Cleaned schema for {tool_name}, removed {fields_removed} fields")
+                    if fields_removed > 0:
+                        logger.debug(f"First 300 chars of cleaned schema: {json.dumps(cleaned_parameters)[:300]}...")
+                except Exception as e:
+                    logger.debug(f"Could not serialize cleaned schema for {tool_name}: {str(e)}")
+                
+        cleaned_tools.append(cleaned_tool)
+    
+    logger.info(f"Cleaned {len(tools)} tool schemas for Gemini compatibility, removed {removed_fields} unsupported fields")
+    return cleaned_tools
+
+
+def validate_and_fix_gemini_schema(function_def, tool_name):
+    """
+    Final validation pass for a Gemini function schema.
+    Ensures all required elements are present and properly formatted.
+    """
+    try:
+        if "parameters" not in function_def:
+            logger.warning(f"Tool {tool_name} missing parameters, adding empty parameters")
+            function_def["parameters"] = {"type": "object", "properties": {}}
+        
+        parameters = function_def["parameters"]
+        
+        # Ensure parameters has required fields
+        if "type" not in parameters:
+            parameters["type"] = "object"
+            
+        if "properties" not in parameters:
+            parameters["properties"] = {}
+            
+        # Validate all object types have properties
+        if parameters.get("type") == "object" and (not parameters.get("properties") or len(parameters.get("properties", {})) == 0):
+            parameters["properties"] = {"_dummy": {"type": "string", "description": "Placeholder property"}}
+            logger.info(f"Added dummy property to empty properties object in {tool_name}")
+            
+        # Fix properties with empty objects
+        for prop_name, prop in parameters.get("properties", {}).items():
+            if isinstance(prop, dict):
+                if prop.get("type") == "object" and "properties" not in prop:
+                    prop["properties"] = {"_dummy": {"type": "string", "description": "Placeholder"}}
+                    
+                # Fix arrays with object items that have no properties
+                if prop.get("type") == "array" and "items" in prop:
+                    items = prop["items"]
+                    if isinstance(items, dict) and items.get("type") == "object" and "properties" not in items:
+                        items["properties"] = {"_dummy": {"type": "string", "description": "Placeholder"}}
+                        
+        # Ensure description is present - required by Gemini
+        if "description" not in function_def:
+            function_def["description"] = f"Function for {tool_name}"
+            logger.info(f"Added missing description to {tool_name}")
+    
+    except Exception as e:
+        logger.error(f"Error validating schema for {tool_name}: {str(e)}")
+
+
+def fix_batch_tool(tool):
+    """
+    Special fixes for BatchTool compatibility with Gemini.
+    """
+    fixed_tool = tool.copy()
+    
+    try:
+        # Get the parameters schema
+        params = fixed_tool["function"]["parameters"]
+        
+        # Fix the invocations structure
+        if "properties" in params and "invocations" in params["properties"]:
+            invocations_prop = params["properties"]["invocations"]
+            
+            # Make sure it has the right structure
+            if "items" in invocations_prop:
+                items = invocations_prop["items"]
+                
+                # Remove additionalProperties if present
+                if "additionalProperties" in items:
+                    del items["additionalProperties"]
+                    logger.info(f"Removed additionalProperties from BatchTool items")
+                
+                # Fix the input object - this is the main issue with BatchTool
+                if "properties" in items and "input" in items["properties"]:
+                    input_prop = items["properties"]["input"]
+                    
+                    # Remove any format fields
+                    if "format" in input_prop:
+                        del input_prop["format"]
+                    
+                    # If input is an object with no properties
+                    if input_prop.get("type") == "object" and "properties" not in input_prop:
+                        # Add concrete properties (Gemini requires these)
+                        input_prop["properties"] = {
+                            "command": {"type": "string", "description": "Command parameter"},
+                            "file_path": {"type": "string", "description": "File path parameter"},
+                            "prompt": {"type": "string", "description": "Prompt parameter"},
+                            "pattern": {"type": "string", "description": "Pattern parameter"},
+                            "path": {"type": "string", "description": "Path parameter"}
+                        }
+                        logger.info(f"Added concrete properties structure to BatchTool input object")
+                        
+    except Exception as e:
+        logger.error(f"Error fixing BatchTool schema: {str(e)}")
+    
+    return fixed_tool
+
+
+def fix_notebook_edit_cell_tool(tool):
+    """
+    Special fixes for NotebookEditCell tool compatibility with Gemini.
+    """
+    fixed_tool = tool.copy()
+    
+    try:
+        # Get the parameters schema
+        params = fixed_tool["function"]["parameters"]
+        
+        # Remove enum fields which can cause issues with Gemini
+        if "properties" in params:
+            props = params["properties"]
+            
+            # Fix the cell_type enum - Gemini has specific format for enums
+            if "cell_type" in props and "enum" in props["cell_type"]:
+                # Convert enum to string type with description listing allowed values
+                enum_values = props["cell_type"]["enum"]
+                props["cell_type"] = {
+                    "type": "string",
+                    "description": f"The type of cell. Allowed values: {', '.join(enum_values)}"
+                }
+                logger.info(f"Converted cell_type enum to string with description for NotebookEditCell")
+            
+            # Fix the edit_mode field - Gemini prefers string over enum
+            if "edit_mode" in props:
+                # Make sure it's just a simple string type
+                props["edit_mode"] = {
+                    "type": "string",
+                    "description": "The type of edit to make (replace, insert, delete). Defaults to replace."
+                }
+                logger.info(f"Simplified edit_mode field for NotebookEditCell")
+                
+    except Exception as e:
+        logger.error(f"Error fixing NotebookEditCell schema: {str(e)}")
+    
+    return fixed_tool
+
+
+def fix_webfetch_tool(tool):
+    """
+    Special fix for WebFetchTool to address the URL format issue.
+    Gemini only supports 'enum' and 'date-time' formats.
+    """
+    fixed_tool = tool.copy()
+    
+    try:
+        # Get the parameters schema
+        params = fixed_tool["function"]["parameters"]
+        
+        # Fix URL property if it exists
+        if ("properties" in params and 
+            "url" in params["properties"] and 
+            "format" in params["properties"]["url"]):
+            
+            # Remove the format field completely
+            if params["properties"]["url"]["format"] == "uri":
+                logger.info("Removing 'uri' format from WebFetchTool url parameter")
+                del params["properties"]["url"]["format"]
+                
+    except Exception as e:
+        logger.error(f"Error fixing WebFetchTool schema: {str(e)}")
+    
+    return fixed_tool
+
+def deep_clean_schema(schema, return_removed_count=False, tool_name=None, path=""):
+    """
+    Recursively clean JSON schema to remove fields not supported by Gemini.
+    
+    Args:
+        schema: The JSON schema to clean
+        return_removed_count: If True, returns a tuple of (cleaned_schema, removed_count)
+        tool_name: Name of the tool being processed (for logging)
+        path: Current path in the schema (for recursion)
+        
+    Returns:
+        The cleaned schema, or a tuple of (cleaned_schema, removed_count) if return_removed_count is True
+    """
+    if not isinstance(schema, dict):
+        return (schema, 0) if return_removed_count else schema
+        
+    # Fields to remove from schema that Gemini doesn't support
+    fields_to_remove = [
+        "additionalProperties", 
+        "$schema", 
+        "$id", 
+        "examples", 
+        "format",
+        "patterns",
+        "contentMediaType",
+        "contentEncoding"
+    ]
+    
+    # Count how many fields we remove
+    removed_count = 0
+    current_path = f"{path}" if not path else f"{path}."
+    
+    # Create a new dict without forbidden fields
+    cleaned_schema = {}
+    for k, v in schema.items():
+        if k not in fields_to_remove:
+            cleaned_schema[k] = v
+        else:
+            field_path = f"{current_path}{k}"
+            if tool_name:
+                logger.debug(f"Removed field '{field_path}' from tool '{tool_name}'")
+            removed_count += 1
+    
+    # Handle URIs and other formats that Gemini doesn't support
+    # Only 'enum' and 'date-time' formats are supported
+    if "format" in schema:
+        format_val = schema["format"]
+        if format_val not in ["enum", "date-time"]:
+            field_path = f"{current_path}format"
+            if tool_name:
+                logger.info(f"Removed unsupported format '{format_val}' at '{field_path}' from tool '{tool_name}'")
+            
+            # Remove the format field if still in cleaned schema
+            if "format" in cleaned_schema:
+                del cleaned_schema["format"]
+                removed_count += 1
+    
+    # Fix empty object properties - Gemini requires non-empty properties for objects
+    if cleaned_schema.get("type") == "object" and "properties" not in cleaned_schema:
+        cleaned_schema["properties"] = {"_placeholder": {"type": "string", "description": "Required placeholder"}}
+        field_path = f"{current_path}properties._placeholder"
+        if tool_name:
+            logger.info(f"Added required properties at '{field_path}' for tool '{tool_name}'")
+        removed_count += 1  # Count adding the placeholder as a change
+    
+    # Recursively clean nested objects
+    for key, value in list(cleaned_schema.items()):
+        new_path = f"{current_path}{key}"
+        
+        if key == "properties" and isinstance(value, dict):
+            # Clean each property
+            for prop_name, prop_schema in list(value.items()):
+                prop_path = f"{new_path}.{prop_name}"
+                if return_removed_count:
+                    cleaned_prop, prop_removed = deep_clean_schema(
+                        prop_schema, 
+                        return_removed_count=True,
+                        tool_name=tool_name,
+                        path=prop_path
+                    )
+                    cleaned_schema[key][prop_name] = cleaned_prop
+                    removed_count += prop_removed
+                else:
+                    cleaned_schema[key][prop_name] = deep_clean_schema(
+                        prop_schema,
+                        tool_name=tool_name,
+                        path=prop_path
+                    )
+                    
+                # Fix empty object types
+                if (isinstance(cleaned_schema[key][prop_name], dict) and 
+                    cleaned_schema[key][prop_name].get("type") == "object" and 
+                    "properties" not in cleaned_schema[key][prop_name]):
+                    
+                    cleaned_schema[key][prop_name]["properties"] = {
+                        "_placeholder": {"type": "string", "description": "Required placeholder"}
+                    }
+                    if tool_name:
+                        logger.info(f"Added required nested properties at '{prop_path}' for tool '{tool_name}'")
+                    removed_count += 1
+                    
+        elif key == "items" and isinstance(value, dict):
+            # Clean array item schema
+            items_path = f"{new_path}"
+            if return_removed_count:
+                cleaned_items, items_removed = deep_clean_schema(
+                    value, 
+                    return_removed_count=True,
+                    tool_name=tool_name,
+                    path=items_path
+                )
+                cleaned_schema[key] = cleaned_items
+                removed_count += items_removed
+            else:
+                cleaned_schema[key] = deep_clean_schema(
+                    value,
+                    tool_name=tool_name,
+                    path=items_path
+                )
+                
+            # Fix empty object types in array items
+            if (isinstance(cleaned_schema[key], dict) and 
+                cleaned_schema[key].get("type") == "object" and 
+                "properties" not in cleaned_schema[key]):
+                
+                cleaned_schema[key]["properties"] = {
+                    "_placeholder": {"type": "string", "description": "Required placeholder"}
+                }
+                if tool_name:
+                    logger.info(f"Added required properties to array items at '{items_path}' for tool '{tool_name}'")
+                removed_count += 1
+                
+        elif isinstance(value, dict):
+            # Clean any nested dict
+            nested_path = f"{new_path}"
+            if return_removed_count:
+                cleaned_dict, dict_removed = deep_clean_schema(
+                    value, 
+                    return_removed_count=True,
+                    tool_name=tool_name,
+                    path=nested_path
+                )
+                cleaned_schema[key] = cleaned_dict
+                removed_count += dict_removed
+            else:
+                cleaned_schema[key] = deep_clean_schema(
+                    value,
+                    tool_name=tool_name,
+                    path=nested_path
+                )
+                
+        elif isinstance(value, list):
+            # Clean list of objects
+            list_path = f"{new_path}"
+            if return_removed_count:
+                cleaned_list = []
+                for i, item in enumerate(value):
+                    if isinstance(item, dict):
+                        cleaned_item, item_removed = deep_clean_schema(
+                            item, 
+                            return_removed_count=True,
+                            tool_name=tool_name,
+                            path=f"{list_path}[{i}]"
+                        )
+                        cleaned_list.append(cleaned_item)
+                        removed_count += item_removed
+                    else:
+                        cleaned_list.append(item)
+                cleaned_schema[key] = cleaned_list
+            else:
+                cleaned_schema[key] = [
+                    deep_clean_schema(
+                        item, 
+                        tool_name=tool_name,
+                        path=f"{list_path}[{i}]"
+                    ) if isinstance(item, dict) else item
+                    for i, item in enumerate(value)
+                ]
+    
+    # Final check - special case for specific tools with problematic fields
+    if tool_name == "BatchTool" and path == "parameters.properties.invocations.items.properties.input":
+        # Make sure BatchTool's input parameter has required properties
+        if "type" in cleaned_schema and cleaned_schema["type"] == "object" and "properties" not in cleaned_schema:
+            cleaned_schema["properties"] = {
+                "command": {"type": "string", "description": "Command parameter"},
+                "file_path": {"type": "string", "description": "File path parameter"}
+            }
+            logger.info(f"Added specific BatchTool input properties at '{path}'")
+            removed_count += 1
+    
+    # Fix WebFetchTool's URL format
+    if tool_name == "WebFetchTool" and "format" in cleaned_schema:
+        if cleaned_schema["format"] == "uri":
+            del cleaned_schema["format"]
+            logger.info(f"Removed 'uri' format from WebFetchTool at path '{path}'")
+            removed_count += 1
+    
+    if return_removed_count:
+        return cleaned_schema, removed_count
+    return cleaned_schema
 
 # Get model mapping configuration from environment
 # deepseek-chat is recommended for all tasks including coding
 BIG_MODEL = os.environ.get("BIG_MODEL", "deepseek-chat")
+BIG_MODEL_PROVIDER = os.environ.get("BIG_MODEL_PROVIDER", "deepseek")  # Can be "deepseek" or "gemini"
+GEMINI_BIG_MODEL = os.environ.get("GEMINI_BIG_MODEL", "gemini-2.5-pro-exp-03-25")  # Gemini model for Sonnet
 SMALL_MODEL = os.environ.get("SMALL_MODEL", "gemini-2.0-flash")  # Default to Gemini Flash for Haiku
 
 # Parse command-line arguments
@@ -190,8 +691,13 @@ class MessagesRequest(BaseModel):
             
             # Handle Sonnet models
             elif 'sonnet' in v.lower():
-                # Map Sonnet to the configured big model
-                new_model = f"deepseek/{BIG_MODEL}"
+                # Map Sonnet to either Deepseek or Gemini based on BIG_MODEL_PROVIDER setting
+                if BIG_MODEL_PROVIDER.lower() == "gemini":
+                    new_model = f"gemini/{GEMINI_BIG_MODEL}"
+                    logger.debug(f"📌 MODEL MAPPING: {original_model} ➡️ {new_model} (Gemini provider)")
+                else:  # Default to Deepseek
+                    new_model = f"deepseek/{BIG_MODEL}"
+                    logger.debug(f"📌 MODEL MAPPING: {original_model} ➡️ {new_model} (Deepseek provider)")
                 v = new_model
                 
                 # Check if thinking is enabled to decide whether to add CoT
@@ -300,8 +806,13 @@ class TokenCountRequest(BaseModel):
             
             # Handle Sonnet models
             elif 'sonnet' in v.lower():
-                # Map Sonnet to the configured big model
-                new_model = f"deepseek/{BIG_MODEL}"
+                # Map Sonnet to either Deepseek or Gemini based on BIG_MODEL_PROVIDER setting
+                if BIG_MODEL_PROVIDER.lower() == "gemini":
+                    new_model = f"gemini/{GEMINI_BIG_MODEL}"
+                    logger.debug(f"📌 MODEL MAPPING: {original_model} ➡️ {new_model} (Gemini provider)")
+                else:  # Default to Deepseek
+                    new_model = f"deepseek/{BIG_MODEL}"
+                    logger.debug(f"📌 MODEL MAPPING: {original_model} ➡️ {new_model} (Deepseek provider)")
                 v = new_model
                 
                 # Check if thinking is enabled to decide whether to add CoT
@@ -408,6 +919,433 @@ async def log_requests(request: Request, call_next):
     
     return response
 
+
+# Create a parameter mapper to handle common parameter naming mismatches
+def map_tool_parameters(tool_call):
+    """Maps and fixes common parameter naming issues in tool calls"""
+    try:
+        logger.warning(f"TOOL DEBUG: map_tool_parameters input type: {type(tool_call)}")
+        
+        if not tool_call:
+            logger.warning("TOOL DEBUG: tool_call is None or empty")
+            return tool_call
+            
+        # Handle different object types correctly
+        function_dict = {}
+        name = ""
+        arguments = {}
+        
+        if hasattr(tool_call, 'function'):
+            # It's an object with a function attribute
+            func = tool_call.function
+            if hasattr(func, 'name'):
+                name = func.name
+            if hasattr(func, 'arguments'):
+                arguments = func.arguments
+                
+            logger.warning(f"TOOL DEBUG: Extracted from object - name: {name}, arguments: {arguments}")
+        elif isinstance(tool_call, dict) and 'function' in tool_call:
+            # It's a dict with a function key
+            function_dict = tool_call['function']
+            if isinstance(function_dict, dict):
+                name = function_dict.get('name', '')
+                arguments = function_dict.get('arguments', {})
+            else:
+                # Function is an object
+                if hasattr(function_dict, 'name'):
+                    name = function_dict.name
+                if hasattr(function_dict, 'arguments'):
+                    arguments = function_dict.arguments
+                    
+            logger.warning(f"TOOL DEBUG: Extracted from dict - name: {name}, arguments: {arguments}")
+        else:
+            logger.warning(f"TOOL DEBUG: Unsupported tool call format")
+            return tool_call
+            
+        # Ensure arguments is a dict
+        if isinstance(arguments, str):
+            try:
+                arguments = json.loads(arguments)
+                logger.warning(f"TOOL DEBUG: Parsed arguments from string to dict: {arguments}")
+            except json.JSONDecodeError as e:
+                logger.warning(f"TOOL DEBUG: Failed to parse arguments JSON: {e}")
+                
+                # Try to apply simple fixes to the JSON
+                args_str = arguments
+                if not args_str.strip().startswith('{'):
+                    args_str = '{' + args_str
+                if not args_str.strip().endswith('}'):
+                    args_str = args_str + '}'
+                    
+                # Try again
+                try:
+                    arguments = json.loads(args_str)
+                    logger.warning(f"TOOL DEBUG: Fixed and parsed arguments: {arguments}")
+                except:
+                    # Give up and return original
+                    logger.warning(f"TOOL DEBUG: Could not fix JSON")
+                    return tool_call
+        
+        # Apply parameter mappings to normalize names
+        # Dictionary of parameter mappings by tool name
+        parameter_mappings = {
+            'View': {
+                'path': 'file_path',
+                'file': 'file_path',
+                'filename': 'file_path',
+                'filepath': 'file_path',
+                'lines': 'limit',
+                'start_line': 'offset',
+                'from_line': 'offset',
+                'line_count': 'limit',
+                'max_lines': 'limit'
+            },
+            'Edit': {
+                'path': 'file_path',
+                'file': 'file_path',
+                'filename': 'file_path',
+                'filepath': 'file_path',
+                'content': 'new_string',
+                'new_content': 'new_string',
+                'replacement': 'new_string',
+                'text': 'old_string',
+                'old_content': 'old_string',
+                'target': 'old_string',
+                'to_replace': 'old_string'
+            },
+            'Replace': {
+                'path': 'file_path',
+                'file': 'file_path',
+                'filename': 'file_path',
+                'filepath': 'file_path',
+                'text': 'content',
+                'new_content': 'content',
+                'data': 'content'
+            },
+            'ReadNotebook': {
+                'path': 'notebook_path',
+                'file': 'notebook_path',
+                'filename': 'notebook_path',
+                'filepath': 'notebook_path',
+                'notebook': 'notebook_path'
+            },
+            'NotebookEditCell': {
+                'path': 'notebook_path',
+                'file': 'notebook_path',
+                'filename': 'notebook_path',
+                'filepath': 'notebook_path',
+                'notebook': 'notebook_path',
+                'cell': 'cell_number',
+                'index': 'cell_number',
+                'cell_index': 'cell_number',
+                'source': 'new_source',
+                'content': 'new_source',
+                'cell_content': 'new_source',
+                'mode': 'edit_mode',
+                'type': 'cell_type'
+            },
+            'GlobTool': {
+                'directory': 'path',
+                'dir': 'path',
+                'search_path': 'path',
+                'glob': 'pattern',
+                'search': 'pattern',
+                'query': 'pattern'
+            },
+            'GrepTool': {
+                'directory': 'path',
+                'dir': 'path',
+                'search_path': 'path',
+                'search': 'pattern',
+                'query': 'pattern',
+                'text': 'pattern',
+                'regex': 'pattern',
+                'file_type': 'include',
+                'extension': 'include',
+                'file_pattern': 'include'
+            },
+            'LS': {
+                'directory': 'path',
+                'dir': 'path',
+                'folder': 'path',
+                'exclude': 'ignore',
+                'excluded': 'ignore',
+                'ignore_patterns': 'ignore'
+            },
+            'WebFetchTool': {
+                'website': 'url',
+                'link': 'url',
+                'uri': 'url',
+                'query': 'prompt',
+                'question': 'prompt',
+                'instruction': 'prompt'
+            },
+            'dispatch_agent': {
+                'task': 'prompt',
+                'instruction': 'prompt',
+                'query': 'prompt',
+                'question': 'prompt'
+            },
+            'BatchTool': {
+                'description': 'description',
+                'calls': 'invocations',
+                'tools': 'invocations'
+            }
+        }
+        
+        # Apply mappings if tool name exists in our mapping dictionary
+        if name in parameter_mappings:
+            mappings = parameter_mappings[name]
+            updated_arguments = {}
+            
+            # Copy all existing arguments
+            for key, value in arguments.items():
+                # If this key should be mapped to another name
+                if key in mappings:
+                    mapped_key = mappings[key]
+                    updated_arguments[mapped_key] = value
+                    logger.warning(f"PARAMETER MAP: Mapped tool parameter {key} -> {mapped_key} for tool {name}")
+                else:
+                    updated_arguments[key] = value
+                    
+            # Special handling for Edit tool if parameters are missing
+            if name == 'Edit':
+                # Create a blank old_string if we're doing a file creation operation
+                if 'file_path' in updated_arguments and 'new_string' in updated_arguments and 'old_string' not in updated_arguments:
+                    updated_arguments['old_string'] = ''
+                    logger.warning(f"PARAMETER MAP: Added empty old_string parameter for Edit tool with file_path and new_string")
+                elif 'path' in arguments and 'content' in arguments and 'old_string' not in updated_arguments:
+                    # Check if we need to map more parameters
+                    if 'path' in arguments and 'path' not in mappings:
+                        updated_arguments['file_path'] = arguments['path']
+                    if 'content' in arguments and 'content' not in mappings:
+                        updated_arguments['new_string'] = arguments['content']
+                    updated_arguments['old_string'] = ''
+                    logger.warning(f"PARAMETER MAP: Added empty old_string parameter for Edit tool with path and content")
+            
+            # Special handling for Replace tool if parameters are missing
+            elif name == 'Replace':
+                if 'file_path' in updated_arguments and 'content' not in updated_arguments:
+                    # Try to find content in other parameters
+                    for param in ['text', 'new_content', 'data']:
+                        if param in arguments:
+                            updated_arguments['content'] = arguments[param]
+                            logger.warning(f"PARAMETER MAP: Mapped {param} to content for Replace tool")
+                            break
+            
+            # Special handling for View tool if parameters are missing expected format
+            elif name == 'View':
+                # Convert string offsets and limits to integers
+                for param in ['offset', 'limit']:
+                    if param in updated_arguments and isinstance(updated_arguments[param], str):
+                        try:
+                            updated_arguments[param] = int(updated_arguments[param])
+                            logger.warning(f"PARAMETER MAP: Converted {param} from string to integer for View tool")
+                        except ValueError:
+                            logger.warning(f"PARAMETER MAP: Could not convert {param} value '{updated_arguments[param]}' to integer")
+            
+            # Special handling for NotebookEditCell tool
+            elif name == 'NotebookEditCell':
+                # Convert cell_number from string to integer if needed
+                if 'cell_number' in updated_arguments and isinstance(updated_arguments['cell_number'], str):
+                    try:
+                        updated_arguments['cell_number'] = int(updated_arguments['cell_number'])
+                        logger.warning(f"PARAMETER MAP: Converted cell_number from string to integer for NotebookEditCell tool")
+                    except ValueError:
+                        logger.warning(f"PARAMETER MAP: Could not convert cell_number value '{updated_arguments['cell_number']}' to integer")
+            
+            arguments = updated_arguments
+            
+        # Construct the fixed tool call
+        result = {
+            'id': getattr(tool_call, 'id', f"tool_{uuid.uuid4()}") if hasattr(tool_call, 'id') else tool_call.get('id', f"tool_{uuid.uuid4()}"),
+            'type': 'function',
+            'function': {
+                'name': name,
+                'arguments': arguments
+            }
+        }
+        
+        logger.warning(f"TOOL DEBUG: Mapped tool call: {json.dumps(result, default=str)}")
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error in map_tool_parameters: {str(e)}")
+        # Return the input unchanged on error
+        return tool_call
+    
+    # Dictionary of parameter mappings by tool name
+    parameter_mappings = {
+        'View': {
+            'path': 'file_path',
+            'file': 'file_path',
+            'filename': 'file_path',
+            'filepath': 'file_path',
+            'lines': 'limit',
+            'start_line': 'offset',
+            'from_line': 'offset',
+            'line_count': 'limit',
+            'max_lines': 'limit'
+        },
+        'Edit': {
+            'path': 'file_path',
+            'file': 'file_path',
+            'filename': 'file_path',
+            'filepath': 'file_path',
+            'content': 'new_string',
+            'new_content': 'new_string',
+            'replacement': 'new_string',
+            'text': 'old_string',
+            'old_content': 'old_string',
+            'target': 'old_string',
+            'to_replace': 'old_string'
+        },
+        'Replace': {
+            'path': 'file_path',
+            'file': 'file_path',
+            'filename': 'file_path',
+            'filepath': 'file_path',
+            'text': 'content',
+            'new_content': 'content',
+            'data': 'content'
+        },
+        'ReadNotebook': {
+            'path': 'notebook_path',
+            'file': 'notebook_path',
+            'filename': 'notebook_path',
+            'filepath': 'notebook_path',
+            'notebook': 'notebook_path'
+        },
+        'NotebookEditCell': {
+            'path': 'notebook_path',
+            'file': 'notebook_path',
+            'filename': 'notebook_path',
+            'filepath': 'notebook_path',
+            'notebook': 'notebook_path',
+            'cell': 'cell_number',
+            'index': 'cell_number',
+            'cell_index': 'cell_number',
+            'source': 'new_source',
+            'content': 'new_source',
+            'cell_content': 'new_source',
+            'mode': 'edit_mode',
+            'type': 'cell_type'
+        },
+        'GlobTool': {
+            'directory': 'path',
+            'dir': 'path',
+            'search_path': 'path',
+            'glob': 'pattern',
+            'search': 'pattern',
+            'query': 'pattern'
+        },
+        'GrepTool': {
+            'directory': 'path',
+            'dir': 'path',
+            'search_path': 'path',
+            'search': 'pattern',
+            'query': 'pattern',
+            'text': 'pattern',
+            'regex': 'pattern',
+            'file_type': 'include',
+            'extension': 'include',
+            'file_pattern': 'include'
+        },
+        'LS': {
+            'directory': 'path',
+            'dir': 'path',
+            'folder': 'path',
+            'exclude': 'ignore',
+            'excluded': 'ignore',
+            'ignore_patterns': 'ignore'
+        },
+        'WebFetchTool': {
+            'website': 'url',
+            'link': 'url',
+            'uri': 'url',
+            'query': 'prompt',
+            'question': 'prompt',
+            'instruction': 'prompt'
+        },
+        'dispatch_agent': {
+            'task': 'prompt',
+            'instruction': 'prompt',
+            'query': 'prompt',
+            'question': 'prompt'
+        },
+        'BatchTool': {
+            'description': 'description',
+            'calls': 'invocations',
+            'tools': 'invocations'
+        }
+    }
+    
+    # Apply mappings if tool name exists in our mapping dictionary
+    if name in parameter_mappings:
+        mappings = parameter_mappings[name]
+        updated_arguments = {}
+        
+        # Copy all existing arguments
+        for key, value in arguments.items():
+            # If this key should be mapped to another name
+            if key in mappings:
+                mapped_key = mappings[key]
+                updated_arguments[mapped_key] = value
+                logger.warning(f"PARAMETER MAP: Mapped tool parameter {key} -> {mapped_key} for tool {name}")
+            else:
+                updated_arguments[key] = value
+                
+        # Special handling for Edit tool if parameters are missing
+        if name == 'Edit':
+            # Create a blank old_string if we're doing a file creation operation
+            if 'file_path' in updated_arguments and 'new_string' in updated_arguments and 'old_string' not in updated_arguments:
+                updated_arguments['old_string'] = ''
+                logger.warning(f"PARAMETER MAP: Added empty old_string parameter for Edit tool with file_path and new_string")
+            elif 'path' in arguments and 'content' in arguments and 'old_string' not in updated_arguments:
+                # Check if we need to map more parameters
+                if 'path' in arguments and 'path' not in mappings:
+                    updated_arguments['file_path'] = arguments['path']
+                if 'content' in arguments and 'content' not in mappings:
+                    updated_arguments['new_string'] = arguments['content']
+                updated_arguments['old_string'] = ''
+                logger.warning(f"PARAMETER MAP: Added empty old_string parameter for Edit tool with path and content")
+        
+        # Special handling for Replace tool if parameters are missing
+        elif name == 'Replace':
+            if 'file_path' in updated_arguments and 'content' not in updated_arguments:
+                # Try to find content in other parameters
+                for param in ['text', 'new_content', 'data']:
+                    if param in arguments:
+                        updated_arguments['content'] = arguments[param]
+                        logger.warning(f"PARAMETER MAP: Mapped {param} to content for Replace tool")
+                        break
+        
+        # Special handling for View tool if parameters are missing expected format
+        elif name == 'View':
+            # Convert string offsets and limits to integers
+            for param in ['offset', 'limit']:
+                if param in updated_arguments and isinstance(updated_arguments[param], str):
+                    try:
+                        updated_arguments[param] = int(updated_arguments[param])
+                        logger.warning(f"PARAMETER MAP: Converted {param} from string to integer for View tool")
+                    except ValueError:
+                        logger.warning(f"PARAMETER MAP: Could not convert {param} value '{updated_arguments[param]}' to integer")
+        
+        # Special handling for NotebookEditCell tool
+        elif name == 'NotebookEditCell':
+            # Convert cell_number from string to integer if needed
+            if 'cell_number' in updated_arguments and isinstance(updated_arguments['cell_number'], str):
+                try:
+                    updated_arguments['cell_number'] = int(updated_arguments['cell_number'])
+                    logger.warning(f"PARAMETER MAP: Converted cell_number from string to integer for NotebookEditCell tool")
+                except ValueError:
+                    logger.warning(f"PARAMETER MAP: Could not convert cell_number value '{updated_arguments['cell_number']}' to integer")
+        
+        # Update the arguments
+        function_call['arguments'] = updated_arguments
+        
+    return tool_call
+
 # Not using validation function as we're using the environment API key
 
 def parse_tool_result_content(content):
@@ -479,6 +1417,12 @@ def convert_anthropic_to_litellm(anthropic_request: MessagesRequest) -> Dict[str
             if system_text:
                 messages.append({"role": "system", "content": system_text.strip()})
     
+    # Special handling for Gemini model - need to modify some parameters
+    is_gemini = False
+    if anthropic_request.model and "gemini" in anthropic_request.model:
+        is_gemini = True
+        logger.info(f"Special handling for Gemini model in request conversion")
+    
     # Add conversation messages
     for idx, msg in enumerate(anthropic_request.messages):
         content = msg.content
@@ -539,7 +1483,12 @@ def convert_anthropic_to_litellm(anthropic_request: MessagesRequest) -> Dict[str
                                         result_content = "Unparseable content"
                             
                             # In OpenAI format, tool results come from the user (rather than being content blocks)
-                            text_content += f"Tool result for {tool_id}:\n{result_content}\n"
+                            # Format the tool result differently for Gemini vs. other models
+                            if is_gemini:
+                                # Gemini prefers simpler tool result format
+                                text_content += f"Tool result: {result_content}\n"
+                            else:
+                                text_content += f"Tool result for {tool_id}:\n{result_content}\n"
                 
                 # Add as a single user message with all the content
                 messages.append({"role": "user", "content": text_content.strip()})
@@ -553,13 +1502,42 @@ def convert_anthropic_to_litellm(anthropic_request: MessagesRequest) -> Dict[str
                         elif block.type == "image":
                             processed_content.append({"type": "image", "source": block.source})
                         elif block.type == "tool_use":
-                            # Handle tool use blocks if needed
-                            processed_content.append({
-                                "type": "tool_use",
-                                "id": block.id,
-                                "name": block.name,
-                                "input": block.input
-                            })
+                            # Special handling for Gemini models - they use a different format for tool calls
+                            if is_gemini:
+                                # For Gemini, convert to functionCall format
+                                try:
+                                    # Format arguments as a JSON string if they're not already
+                                    args = block.input if hasattr(block, "input") else {}
+                                    if isinstance(args, dict):
+                                        args_str = json.dumps(args)
+                                    else:
+                                        args_str = str(args)
+                                    
+                                    processed_content.append({
+                                        "type": "function_call",
+                                        "function_call": {
+                                            "name": block.name if hasattr(block, "name") else "unknown_tool",
+                                            "arguments": args_str
+                                        }
+                                    })
+                                    logger.info(f"Transformed tool_use to Gemini function_call format")
+                                except Exception as e:
+                                    logger.warning(f"Error converting tool_use to Gemini format: {str(e)}")
+                                    # Fallback to standard format
+                                    processed_content.append({
+                                        "type": "tool_use",
+                                        "id": block.id if hasattr(block, "id") else f"call_{uuid.uuid4()}",
+                                        "name": block.name if hasattr(block, "name") else "unknown_tool",
+                                        "input": block.input if hasattr(block, "input") else {}
+                                    })
+                            else:
+                                # For other models, use standard format
+                                processed_content.append({
+                                    "type": "tool_use",
+                                    "id": block.id if hasattr(block, "id") else f"call_{uuid.uuid4()}",
+                                    "name": block.name if hasattr(block, "name") else "unknown_tool",
+                                    "input": block.input if hasattr(block, "input") else {}
+                                })
                         elif block.type == "tool_result":
                             # Handle different formats of tool result content
                             processed_content_block = {
@@ -631,6 +1609,7 @@ def convert_anthropic_to_litellm(anthropic_request: MessagesRequest) -> Dict[str
     
     # Convert tools to OpenAI format
     if anthropic_request.tools:
+        logger.warning(f"TOOL DEBUG: Converting {len(anthropic_request.tools)} tools to OpenAI format")
         openai_tools = []
         for tool in anthropic_request.tools:
             # Convert to dict if it's a pydantic model
@@ -654,6 +1633,22 @@ def convert_anthropic_to_litellm(anthropic_request: MessagesRequest) -> Dict[str
             openai_tools.append(openai_tool)
             
         litellm_request["tools"] = openai_tools
+        
+        # WORKAROUND: For Deepseek model, try forcing tool use
+        # If the model is deepseek and we have tools, force the model to use a specific tool
+        if "deepseek" in anthropic_request.model.lower():
+            # Get the first tool
+            first_tool_name = openai_tools[0]["function"]["name"]
+            logger.warning(f"TOOL DEBUG: WORKAROUND - Forcing Deepseek to use tool: {first_tool_name}")
+            
+            # Set tool_choice to force using this function
+            litellm_request["tool_choice"] = {
+                "type": "function",
+                "function": {"name": first_tool_name}
+            }
+            logger.warning(f"TOOL DEBUG: Set tool_choice to force function: {first_tool_name}")
+        
+        logger.warning(f"TOOL DEBUG: Converted tools: {json.dumps(openai_tools)}")
     
     # Convert tool_choice to OpenAI format if present
     if anthropic_request.tool_choice:
@@ -707,6 +1702,135 @@ def convert_litellm_to_anthropic(litellm_response: Union[Dict[str, Any], Any],
             message = choices[0].message if choices and len(choices) > 0 else None
             content_text = message.content if message and hasattr(message, 'content') else ""
             tool_calls = message.tool_calls if message and hasattr(message, 'tool_calls') else None
+            
+            # Apply parameter mapping to fix common parameter naming issues
+            if tool_calls:
+                if isinstance(tool_calls, list):
+                    # Map parameters for each tool call
+                    mapped_tool_calls = []
+                    for tc in tool_calls:
+                        # Handle different object types
+                        if hasattr(tc, 'function'):
+                            # It's a direct object with function attribute
+                            func_obj = tc.function
+                            tool_id = getattr(tc, 'id', f"tool_{uuid.uuid4()}")
+                            
+                            # Get function name
+                            name = ""
+                            if hasattr(func_obj, 'name'):
+                                name = func_obj.name
+                                
+                            # Get function arguments
+                            args = {}
+                            if hasattr(func_obj, 'arguments'):
+                                args_str = func_obj.arguments
+                                if isinstance(args_str, str):
+                                    try:
+                                        args = json.loads(args_str)
+                                    except json.JSONDecodeError:
+                                        args = {"raw_args": args_str}
+                                else:
+                                    args = args_str
+                                    
+                            # Create a properly structured tool call
+                            tc_dict = {
+                                "id": tool_id,
+                                "type": "function",
+                                "function": {
+                                    "name": name,
+                                    "arguments": args
+                                }
+                            }
+                            
+                            logger.warning(f"TOOL DEBUG: Created structured tool call from object: {json.dumps(tc_dict, default=str)}")
+                        elif isinstance(tc, dict):
+                            # It's already a dict
+                            tc_dict = tc
+                            logger.warning(f"TOOL DEBUG: Using existing tool call dict: {json.dumps(tc_dict, default=str)}")
+                        else:
+                            # Try to convert to dict
+                            try:
+                                if hasattr(tc, 'model_dump'):
+                                    tc_dict = tc.model_dump()
+                                elif hasattr(tc, 'dict'):
+                                    tc_dict = tc.dict()
+                                elif hasattr(tc, '__dict__'):
+                                    tc_dict = tc.__dict__
+                                else:
+                                    # Last resort - serialize and create empty dict
+                                    logger.warning(f"TOOL DEBUG: Unable to convert tool call to dict, type: {type(tc)}")
+                                    tc_dict = {"raw": str(tc)}
+                            except Exception as e:
+                                logger.warning(f"TOOL DEBUG: Error converting tool call to dict: {str(e)}")
+                                tc_dict = {"error": str(e)}
+                                
+                        # Now apply parameter mapping
+                        mapped_tc = map_tool_parameters(tc_dict)
+                        mapped_tool_calls.append(mapped_tc)
+                        
+                    tool_calls = mapped_tool_calls
+                else:
+                    # Single tool call - handle same as above
+                    tc = tool_calls
+                    if hasattr(tc, 'function'):
+                        # It's a direct object with function attribute
+                        func_obj = tc.function
+                        tool_id = getattr(tc, 'id', f"tool_{uuid.uuid4()}")
+                        
+                        # Get function name
+                        name = ""
+                        if hasattr(func_obj, 'name'):
+                            name = func_obj.name
+                            
+                        # Get function arguments
+                        args = {}
+                        if hasattr(func_obj, 'arguments'):
+                            args_str = func_obj.arguments
+                            if isinstance(args_str, str):
+                                try:
+                                    args = json.loads(args_str)
+                                except json.JSONDecodeError:
+                                    args = {"raw_args": args_str}
+                            else:
+                                args = args_str
+                                
+                        # Create a properly structured tool call
+                        tc_dict = {
+                            "id": tool_id,
+                            "type": "function",
+                            "function": {
+                                "name": name,
+                                "arguments": args
+                            }
+                        }
+                        
+                        logger.warning(f"TOOL DEBUG: Created structured tool call from object: {json.dumps(tc_dict, default=str)}")
+                    elif isinstance(tc, dict):
+                        # It's already a dict
+                        tc_dict = tc
+                        logger.warning(f"TOOL DEBUG: Using existing tool call dict: {json.dumps(tc_dict, default=str)}")
+                    else:
+                        # Try to convert to dict
+                        try:
+                            if hasattr(tc, 'model_dump'):
+                                tc_dict = tc.model_dump()
+                            elif hasattr(tc, 'dict'):
+                                tc_dict = tc.dict()
+                            elif hasattr(tc, '__dict__'):
+                                tc_dict = tc.__dict__
+                            else:
+                                # Last resort - serialize and create empty dict
+                                logger.warning(f"TOOL DEBUG: Unable to convert tool call to dict, type: {type(tc)}")
+                                tc_dict = {"raw": str(tc)}
+                        except Exception as e:
+                            logger.warning(f"TOOL DEBUG: Error converting tool call to dict: {str(e)}")
+                            tc_dict = {"error": str(e)}
+                            
+                    # Apply parameter mapping
+                    tool_calls = map_tool_parameters(tc_dict)
+                    
+                logger.warning(f"TOOL DEBUG: After parameter mapping: {json.dumps(tool_calls, default=str)}")
+                
             finish_reason = choices[0].finish_reason if choices and len(choices) > 0 else "stop"
             usage_info = litellm_response.usage
             response_id = getattr(litellm_response, 'id', f"msg_{uuid.uuid4()}")
@@ -732,25 +1856,233 @@ def convert_litellm_to_anthropic(litellm_response: Union[Dict[str, Any], Any],
             message = choices[0].get("message", {}) if choices and len(choices) > 0 else {}
             content_text = message.get("content", "")
             tool_calls = message.get("tool_calls", None)
+            
+            # Apply parameter mapping to fix common parameter naming issues
+            if tool_calls:
+                if isinstance(tool_calls, list):
+                    # Map parameters for each tool call
+                    mapped_tool_calls = []
+                    for tc in tool_calls:
+                        mapped_tc = map_tool_parameters(tc)
+                        mapped_tool_calls.append(mapped_tc)
+                    tool_calls = mapped_tool_calls
+                else:
+                    # Single tool call
+                    tool_calls = map_tool_parameters(tool_calls)
+                    
+                logger.warning(f"TOOL DEBUG: After parameter mapping: {json.dumps(tool_calls, default=str)}")
+                
             finish_reason = choices[0].get("finish_reason", "stop") if choices and len(choices) > 0 else "stop"
+            
+            # Add debug logging for finish_reason
+            if finish_reason == "tool_calls":
+                logger.warning(f"TOOL DEBUG: Response has finish_reason='tool_calls', indicating tool usage")
+            elif tool_calls:
+                logger.warning(f"TOOL DEBUG: Response has tool_calls but finish_reason='{finish_reason}'")
+                
             usage_info = response_dict.get("usage", {})
             response_id = response_dict.get("id", f"msg_{uuid.uuid4()}")
         
         # Create content list for Anthropic format
         content = []
         
+        # FEATURE: If tool_calls is empty/None but the content_text suggests a tool call,
+        # try to extract it from the text response
+        if (not tool_calls or tool_calls == []) and content_text and ("deepseek" in clean_model.lower() or "gemini" in clean_model.lower()):
+            # Apply this logic to Deepseek and Gemini models which might not support function calling properly
+            logger.warning(f"TOOL DEBUG: Attempting to extract tool calls from text: {content_text[:100]}...")
+            
+            # Check for sequence indicators that might suggest multiple tools will be used
+            multiple_tool_sequence = False
+            sequence_markers = [
+                "I'll follow these steps:",
+                "Here are the steps I'll follow:",
+                "I'll perform the following actions:",
+                "Step 1:",
+                "First, I'll",
+                "First I'll use",
+                "First, I will use",
+                "Let me use multiple tools:",
+                "I need to use several tools:",
+                "I'll use the following tools in sequence:",
+                "To complete this task, I'll use:"
+            ]
+            
+            for marker in sequence_markers:
+                if marker in content_text:
+                    multiple_tool_sequence = True
+                    logger.warning(f"TOOL DEBUG: Detected potential multiple tool sequence with marker: '{marker}'")
+                    break
+            
+            # Common patterns for tool usage in text
+            tool_patterns = [
+                # Format: "Using the X tool with parameters..."
+                r"(?:Using|Use|I'll use|Let me use|Using the|I will use)(?: the)? ([A-Za-z]+)(?: tool)? (?:with|to|for)(.*?)(?:\.|\n|$)",
+                
+                # Format: "[Tool: X (arguments)]"
+                r"\[Tool: ([A-Za-z]+)(?: \(([^)]*)\))?\]",
+                
+                # Format: "Tool(param1=value, param2=value)"
+                r"([A-Za-z]+)\(([^)]*)\)",
+                
+                # Format: "Tool: X, Parameters: {...}"
+                r"Tool: ([A-Za-z]+)(?:,|\n|\s+)(?:Parameters|Arguments|Params|Args|Input)?: (.+?)(?:\.|\n|$)",
+                
+                # Format: "I need to use the X tool to..."
+                r"(?:I need to|I should|I can|I must|We should|We need to|Let's)(?: use| execute| call| run| invoke)(?: the)? ([A-Za-z]+)(?: tool| function)?(.*?)(?:\.|\n|$)",
+                
+                # Format: "Execute X with parameters..."
+                r"(?:Execute|Run|Call|Invoke|Utilize|Apply)(?: the)? ([A-Za-z]+)(?: tool| function)?(.*?)(?:\.|\n|$)",
+                
+                # Format: "To accomplish this, I'll use X..."
+                r"(?:To|For)(?: this| that)(?:,|:)? (?:I'll|I will|we'll|we will|I'm going to|I am going to|let me|let's) (?:use|try|call|execute|run|utilize) (?:the )?([A-Za-z]+)(?: tool| function)?(.*?)(?:\.|\n|$)",
+                
+                # Format: "X tool can be used with parameters..."
+                r"(?:The )?([A-Za-z]+)(?: tool| function) (?:can be|should be|will be|is) (?:used|executed|called|run|invoked|applied)(.*?)(?:\.|\n|$)"
+            ]
+            
+            extracted_tool = None
+            extracted_tools = []  # Keep track of all tools to handle multiple tool sequences
+            
+            for pattern in tool_patterns:
+                matches = re.findall(pattern, content_text, re.DOTALL | re.IGNORECASE)
+                if matches:
+                    for match in matches:
+                        if isinstance(match, tuple) and len(match) >= 2:
+                            tool_name = match[0].strip()
+                            param_text = match[1].strip()
+                            
+                            # Store information about this potential tool
+                            extracted_tools.append({
+                                "tool_name": tool_name,
+                                "param_text": param_text,
+                                "pattern": pattern
+                            })
+            
+            # If we found multiple potential tool matches
+            if len(extracted_tools) > 0:
+                logger.warning(f"TOOL DEBUG: Found {len(extracted_tools)} potential tool references in text")
+                
+                # For multiple tool sequences, just use the first valid tool
+                for potential_tool in extracted_tools:
+                    tool_name = potential_tool["tool_name"]
+                    param_text = potential_tool["param_text"]
+                    
+                    # Check if tool name is one of our supported tools
+                    supported_tools = ["Bash", "BatchTool", "GlobTool", "GrepTool", "LS", 
+                                      "View", "Edit", "Replace", "ReadNotebook", 
+                                      "NotebookEditCell", "WebFetchTool", "dispatch_agent"]
+                    
+                    if tool_name in supported_tools:
+                        logger.warning(f"TOOL DEBUG: Extracted tool '{tool_name}' from text with params: {param_text}")
+                        
+                        # Try to parse parameters
+                        params = {}
+                        
+                        # First, check if the param_text looks like valid JSON
+                        try:
+                            # Check if it starts with '{' and ends with '}'
+                            if param_text.strip().startswith('{') and param_text.strip().endswith('}'):
+                                json_params = json.loads(param_text.strip())
+                                if isinstance(json_params, dict):
+                                    params = json_params
+                                    logger.warning(f"TOOL DEBUG: Successfully extracted parameters as JSON: {params}")
+                        except Exception as e:
+                            logger.warning(f"TOOL DEBUG: JSON parsing failed: {str(e)}, falling back to regex parsing")
+                        
+                        # If JSON parsing failed or no parameters were found, try regex patterns
+                        if not params:
+                            # Try multiple regex patterns for different parameter formats
+                            
+                            # Pattern 1: key="value" or key='value' or key=value
+                            param_pairs = re.findall(r'(\w+)\s*[=:]\s*(?:"([^"]*)"|\'([^\']*)\'|([^,\s]*))', param_text)
+                            for pair in param_pairs:
+                                key = pair[0]
+                                # Find first non-empty value
+                                value = next((v for v in pair[1:] if v), "")
+                                params[key] = value
+                            
+                            # Pattern 2: "key": "value" (JSON-like but without braces)
+                            if not params:
+                                param_pairs = re.findall(r'"(\w+)"\s*:\s*(?:"([^"]*)"|\'([^\']*)\'|([^,\s]*))', param_text)
+                                for pair in param_pairs:
+                                    key = pair[0]
+                                    # Find first non-empty value
+                                    value = next((v for v in pair[1:] if v), "")
+                                    params[key] = value
+                            
+                            # Pattern 3: key: value (YAML-like)
+                            if not params:
+                                param_pairs = re.findall(r'(\w+)\s*:\s*(?:"([^"]*)"|\'([^\']*)\'|([^,\n]*))', param_text)
+                                for pair in param_pairs:
+                                    key = pair[0]
+                                    # Find first non-empty value
+                                    value = next((v for v in pair[1:] if v), "").strip()
+                                    params[key] = value
+                            
+                            # Pattern 4: key is value
+                            if not params:
+                                param_pairs = re.findall(r'(\w+)\s+is\s+(?:"([^"]*)"|\'([^\']*)\'|([^,\n]*))', param_text)
+                                for pair in param_pairs:
+                                    key = pair[0]
+                                    # Find first non-empty value
+                                    value = next((v for v in pair[1:] if v), "").strip()
+                                    params[key] = value
+                            
+                            logger.warning(f"TOOL DEBUG: Extracted parameters via regex: {params}")
+                        
+                        # Create a synthetic tool call
+                        extracted_tool = {
+                            "id": f"extracted_{uuid.uuid4()}",
+                            "type": "function",
+                            "function": {
+                                "name": tool_name,
+                                "arguments": params
+                            }
+                        }
+                        
+                        # Apply parameter mapping to fix any parameter naming issues
+                        extracted_tool = map_tool_parameters(extracted_tool)
+                        
+                        # Remove the tool usage part from content_text to avoid duplication
+                        match_text = potential_tool["tool_name"] + potential_tool["param_text"]
+                        content_text = content_text.replace(match_text, "").strip()
+                        
+                        # Log the extracted tool
+                        logger.warning(f"TOOL DEBUG: Constructed synthetic tool call: {json.dumps(extracted_tool)}")
+                        break
+                    
+                # No break needed here - we'll use the extracted_tool if found
+            
+            # If we found a tool call, add it to the tool_calls list
+            if extracted_tool:
+                tool_calls = [extracted_tool]
+                # Set finish_reason to tool_calls to indicate tool usage
+                finish_reason = "tool_calls"
+                logger.warning(f"TOOL DEBUG: Added synthetic tool call to response")
+        
         # Add text content block if present (text might be None or empty for pure tool call responses)
         if content_text is not None and content_text != "":
             content.append({"type": "text", "text": content_text})
         
-        # Add tool calls if present (tool_use in Anthropic format) - only for Claude models
-        if tool_calls and is_claude_model:
+        # Add tool calls if present (tool_use in Anthropic format)
+        if tool_calls:
+            # Enhanced logging for tool calls
+            try:
+                if isinstance(tool_calls, list):
+                    logger.warning(f"TOOL DEBUG: Received {len(tool_calls)} tool calls from model: {json.dumps(tool_calls)}")
+                else:
+                    logger.warning(f"TOOL DEBUG: Received tool call from model: {json.dumps([tool_calls])}")
+            except Exception as e:
+                logger.warning(f"TOOL DEBUG: Error serializing tool calls: {str(e)}, raw tool_calls: {tool_calls}")
+                
             logger.debug(f"Processing tool calls: {tool_calls}")
             
             # Convert to list if it's not already
             if not isinstance(tool_calls, list):
                 tool_calls = [tool_calls]
-                
+            
+            # For any model with valid tool calls, format as tool_use blocks
             for idx, tool_call in enumerate(tool_calls):
                 logger.debug(f"Processing tool call {idx}: {tool_call}")
                 
@@ -776,53 +2108,13 @@ def convert_litellm_to_anthropic(litellm_response: Union[Dict[str, Any], Any],
                 
                 logger.debug(f"Adding tool_use block: id={tool_id}, name={name}, input={arguments}")
                 
+                # Add the tool_use content block
                 content.append({
                     "type": "tool_use",
                     "id": tool_id,
                     "name": name,
                     "input": arguments
                 })
-        elif tool_calls and not is_claude_model:
-            # For non-Claude models, convert tool calls to text format
-            logger.debug(f"Converting tool calls to text for non-Claude model: {clean_model}")
-            
-            # We'll append tool info to the text content
-            tool_text = "\n\nTool usage:\n"
-            
-            # Convert to list if it's not already
-            if not isinstance(tool_calls, list):
-                tool_calls = [tool_calls]
-                
-            for idx, tool_call in enumerate(tool_calls):
-                # Extract function data based on whether it's a dict or object
-                if isinstance(tool_call, dict):
-                    function = tool_call.get("function", {})
-                    tool_id = tool_call.get("id", f"tool_{uuid.uuid4()}")
-                    name = function.get("name", "")
-                    arguments = function.get("arguments", "{}")
-                else:
-                    function = getattr(tool_call, "function", None)
-                    tool_id = getattr(tool_call, "id", f"tool_{uuid.uuid4()}")
-                    name = getattr(function, "name", "") if function else ""
-                    arguments = getattr(function, "arguments", "{}") if function else "{}"
-                
-                # Convert string arguments to dict if needed
-                if isinstance(arguments, str):
-                    try:
-                        args_dict = json.loads(arguments)
-                        arguments_str = json.dumps(args_dict, indent=2)
-                    except json.JSONDecodeError:
-                        arguments_str = arguments
-                else:
-                    arguments_str = json.dumps(arguments, indent=2)
-                
-                tool_text += f"Tool: {name}\nArguments: {arguments_str}\n\n"
-            
-            # Add or append tool text to content
-            if content and content[0]["type"] == "text":
-                content[0]["text"] += tool_text
-            else:
-                content.append({"type": "text", "text": tool_text})
         
         # Get usage information - extract values safely from object or dict
         if isinstance(usage_info, dict):
@@ -882,6 +2174,22 @@ def convert_litellm_to_anthropic(litellm_response: Union[Dict[str, Any], Any],
 async def handle_streaming(response_generator, original_request: MessagesRequest):
     """Handle streaming responses from LiteLLM and convert to Anthropic format."""
     try:
+        # Check if we're using Gemini model for special handling
+        is_gemini = False
+        if hasattr(original_request, 'model') and "gemini" in original_request.model:
+            is_gemini = True
+            logger.info(f"Using special Gemini handling for streaming responses")
+            
+            # Check if tools are being used with Gemini
+            if hasattr(original_request, 'tools') and original_request.tools:
+                tool_count = len(original_request.tools)
+                logger.info(f"Gemini streaming with {tool_count} tools - using enhanced function call processing")
+                
+                # Set some markers for tracking function call state
+                function_call_accumulator = None
+                is_expecting_function_call = True if original_request.tool_choice != "none" else False
+                function_call_complete = False
+        
         # Send message_start event
         message_id = f"msg_{uuid.uuid4().hex[:24]}"  # Format similar to Anthropic's IDs
         
@@ -891,7 +2199,7 @@ async def handle_streaming(response_generator, original_request: MessagesRequest
                 'id': message_id,
                 'type': 'message',
                 'role': 'assistant',
-                'model': original_request.model,
+                'model': original_request.original_model if hasattr(original_request, 'original_model') else original_request.model,
                 'content': [],
                 'stop_reason': None,
                 'stop_sequence': None,
@@ -1211,8 +2519,53 @@ async def create_message(
             litellm_request["api_key"] = DEEPSEEK_API_KEY
             logger.debug(f"Using Deepseek API key for model: {request.model}")
         elif request.model.startswith("gemini/"):
-            litellm_request["api_key"] = GEMINI_API_KEY
-            logger.debug(f"Using Gemini API key for model: {request.model}")
+            # Use key rotation system for Gemini API calls
+            litellm_request["api_key"] = get_next_gemini_api_key()
+            logger.debug(f"Using Gemini API key #{gemini_key_counter+1}/{len(GEMINI_API_KEYS)} for model: {request.model}")
+            
+            # Clean tool schemas for Gemini compatibility
+            if "tools" in litellm_request:
+                original_tools = litellm_request["tools"]
+                cleaned_tools = clean_gemini_tools(original_tools)
+                litellm_request["tools"] = cleaned_tools
+                logger.debug(f"Cleaned tool schemas for Gemini compatibility, tools count: {len(cleaned_tools)}")
+                
+            # Fix tool_choice for Gemini
+            if "tool_choice" in litellm_request:
+                logger.info(f"Original tool_choice: {json.dumps(litellm_request['tool_choice'])}")
+                
+                # Gemini expects either "none", "auto", or a specific function
+                # Auto in Gemini is called "any" (different from OpenAI's "auto")
+                if isinstance(litellm_request["tool_choice"], str):
+                    if litellm_request["tool_choice"] == "auto":
+                        litellm_request["tool_choice"] = "any"
+                        logger.info(f"Changed tool_choice from 'auto' to 'any' for Gemini compatibility")
+                    elif litellm_request["tool_choice"] == "required":
+                        # Force tool use
+                        litellm_request["tool_choice"] = "any"
+                        logger.info(f"Changed tool_choice from 'required' to 'any' for Gemini compatibility")
+                
+                # If it's a dict with function object, ensure it's in the right format
+                elif isinstance(litellm_request["tool_choice"], dict):
+                    # Handle the "function" key case
+                    if "function" in litellm_request["tool_choice"]:
+                        # Extract the function name to force that specific function
+                        function_name = litellm_request["tool_choice"]["function"].get("name")
+                        if function_name:
+                            # For specific named function, Gemini needs a specific format
+                            litellm_request["tool_choice"] = {
+                                "type": "function",
+                                "function": {"name": function_name}
+                            }
+                            logger.info(f"Reformatted function tool_choice to Gemini format for function: {function_name}")
+                        else:
+                            # If no specific function, default to any
+                            litellm_request["tool_choice"] = "any"
+                            logger.info(f"Simplified function tool_choice without name to 'any' for Gemini compatibility")
+                    else:
+                        # For all other cases, simply use 'any'
+                        litellm_request["tool_choice"] = "any"
+                        logger.info(f"Simplified complex tool_choice to 'any' for Gemini compatibility")
         else:
             litellm_request["api_key"] = ANTHROPIC_API_KEY
             logger.debug(f"Using Anthropic API key for model: {request.model}")
@@ -1392,9 +2745,195 @@ async def create_message(
                 num_tools,
                 200  # Assuming success at this point
             )
+            
+            # Log additional details about tool usage in request
+            if num_tools > 0:
+                logger.warning(f"TOOL DEBUG: Making completion request with {num_tools} tools enabled, model={litellm_request.get('model')}")
+                if 'tool_choice' in litellm_request:
+                    logger.warning(f"TOOL DEBUG: tool_choice set to: {litellm_request.get('tool_choice')}")
+                
+                # Log detailed request information
+                try:
+                    # Log messages
+                    messages_count = len(litellm_request.get('messages', []))
+                    logger.warning(f"REQUEST DEBUG: Sending {messages_count} messages")
+                    
+                    # Log last user message 
+                    last_user_message = None
+                    for msg in reversed(litellm_request.get('messages', [])):
+                        if msg.get('role') == 'user':
+                            last_user_message = msg
+                            break
+                            
+                    if last_user_message:
+                        logger.warning(f"REQUEST DEBUG: Last user message: {json.dumps(last_user_message.get('content'), indent=2)[:500]}...")
+                    
+                    # Log tools details
+                    tools = litellm_request.get('tools', [])
+                    tool_names = [tool.get('function', {}).get('name') for tool in tools]
+                    logger.warning(f"REQUEST DEBUG: Tool names: {tool_names}")
+                    
+                    # Log detailed tool information for easier debugging
+                    logger.warning(f"TOOL DEBUG: Sending {len(tools)} tool definitions to model")
+                    for i, tool in enumerate(tools):
+                        if 'function' in tool:
+                            tool_name = tool['function'].get('name', 'unnamed')
+                            tool_desc = tool['function'].get('description', '')[:100]
+                            logger.warning(f"TOOL DEBUG: Tool {i+1}: {tool_name} - {tool_desc}")
+                            
+                            # Log parameter schema
+                            if 'parameters' in tool['function']:
+                                param_schema = tool['function']['parameters']
+                                required_params = param_schema.get('required', [])
+                                properties = param_schema.get('properties', {})
+                                
+                                param_summary = []
+                                for param_name, param_info in properties.items():
+                                    is_required = "Required" if param_name in required_params else "Optional"
+                                    param_type = param_info.get('type', 'unknown')
+                                    param_desc = param_info.get('description', '')[:50]
+                                    param_summary.append(f"{param_name} ({param_type}, {is_required}): {param_desc}")
+                                
+                                logger.warning(f"TOOL DEBUG: {tool_name} parameters: {json.dumps(param_summary, indent=2)}")
+                    
+                    # Log a summary of the request
+                    req_summary = {
+                        "model": litellm_request.get('model'),
+                        "messages_count": messages_count,
+                        "tools_count": len(tools),
+                        "tool_names": tool_names,
+                        "max_tokens": litellm_request.get('max_tokens'),
+                        "temperature": litellm_request.get('temperature'),
+                        "has_tool_choice": 'tool_choice' in litellm_request
+                    }
+                    logger.warning(f"REQUEST DEBUG: Request summary: {json.dumps(req_summary, indent=2)}")
+                    
+                except Exception as e:
+                    logger.warning(f"REQUEST DEBUG: Error logging request details: {str(e)}")
+            
             start_time = time.time()
             litellm_response = litellm.completion(**litellm_request)
             logger.debug(f"✅ RESPONSE RECEIVED: Model={litellm_request.get('model')}, Time={time.time() - start_time:.2f}s")
+            
+            # Detailed logging of raw response for debugging
+            try:
+                # Get provider from model
+                provider = "unknown"
+                if "deepseek" in litellm_request.get('model', ""):
+                    provider = "deepseek"
+                elif "gemini" in litellm_request.get('model', ""):
+                    provider = "gemini"
+                    
+                # Save raw string representation for debugging
+                raw_str = str(litellm_response)
+                logger.warning(f"ULTRA RAW RESPONSE DEBUG [{provider}]: {raw_str[:2000]}")
+                
+                # Convert to dict if it's not already
+                if hasattr(litellm_response, 'dict'):
+                    raw_response = litellm_response.dict()
+                elif hasattr(litellm_response, 'model_dump'):
+                    raw_response = litellm_response.model_dump()
+                else:
+                    raw_response = litellm_response
+                
+                # Get direct access to the raw response object
+                direct_response = None
+                if hasattr(litellm_response, '_response'):
+                    direct_response = litellm_response._response
+                    logger.warning(f"DIRECT RESPONSE DEBUG [{provider}]: {str(direct_response)[:2000]}")
+                    
+                    # Try to get JSON from direct response
+                    try:
+                        if hasattr(direct_response, 'json'):
+                            direct_json = direct_response.json()
+                            logger.warning(f"DIRECT JSON RESPONSE DEBUG [{provider}]: {json.dumps(direct_json, indent=2)[:2000]}")
+                    except Exception as json_e:
+                        logger.warning(f"Error extracting JSON from direct response: {str(json_e)}")
+                
+                # Convert to string for logging
+                try:
+                    # Use custom serializer to handle non-serializable objects
+                    def default_serializer(obj):
+                        try:
+                            return str(obj)
+                        except:
+                            return "<non-serializable>"
+                            
+                    raw_response_str = json.dumps(raw_response, indent=2, default=default_serializer)
+                    logger.warning(f"RAW RESPONSE DEBUG: Full response from {litellm_request.get('model')}:\n{raw_response_str[:5000]}")
+                except Exception as json_err:
+                    logger.warning(f"Error serializing response to JSON: {str(json_err)}")
+                    logger.warning(f"Falling back to str representation: {str(raw_response)[:2000]}")
+                
+                # Log choices specifically for easier analysis
+                if hasattr(litellm_response, 'choices'):
+                    choices = litellm_response.choices
+                    logger.warning(f"RAW RESPONSE DEBUG: Number of choices: {len(choices)}")
+                    for i, choice in enumerate(choices):
+                        logger.warning(f"RAW RESPONSE DEBUG: Choice {i}:")
+                        
+                        # Log all attributes of choice
+                        for attr_name in dir(choice):
+                            if not attr_name.startswith('_'):
+                                try:
+                                    attr_value = getattr(choice, attr_name)
+                                    if not callable(attr_value):
+                                        logger.warning(f"RAW RESPONSE DEBUG: choice.{attr_name} = {attr_value}")
+                                except Exception as attr_err:
+                                    logger.warning(f"Error getting attr {attr_name}: {str(attr_err)}")
+                        
+                        # Log finish_reason
+                        finish_reason = getattr(choice, 'finish_reason', None)
+                        logger.warning(f"RAW RESPONSE DEBUG: finish_reason = {finish_reason}")
+                        
+                        # Log message
+                        message = getattr(choice, 'message', None)
+                        if message:
+                            # Log all attributes of message
+                            for msg_attr in dir(message):
+                                if not msg_attr.startswith('_'):
+                                    try:
+                                        msg_attr_value = getattr(message, msg_attr)
+                                        if not callable(msg_attr_value):
+                                            logger.warning(f"RAW RESPONSE DEBUG: message.{msg_attr} = {msg_attr_value}")
+                                    except Exception as msg_attr_err:
+                                        logger.warning(f"Error getting message attr {msg_attr}: {str(msg_attr_err)}")
+                            
+                            # Log content
+                            content = getattr(message, 'content', None)
+                            logger.warning(f"RAW RESPONSE DEBUG: content type = {type(content)}, value = {content}")
+                            
+                            # Log role
+                            role = getattr(message, 'role', None)
+                            logger.warning(f"RAW RESPONSE DEBUG: role = {role}")
+                            
+                            # Log tool_calls specifically
+                            tool_calls = getattr(message, 'tool_calls', None)
+                            if tool_calls:
+                                logger.warning(f"RAW RESPONSE DEBUG: tool_calls present = TRUE, type = {type(tool_calls)}")
+                                if isinstance(tool_calls, list):
+                                    logger.warning(f"RAW RESPONSE DEBUG: Number of tool_calls: {len(tool_calls)}")
+                                    for j, call in enumerate(tool_calls):
+                                        try:
+                                            call_str = json.dumps(call, default=default_serializer)
+                                            logger.warning(f"RAW RESPONSE DEBUG: Tool call {j}: {call_str}")
+                                        except:
+                                            logger.warning(f"RAW RESPONSE DEBUG: Tool call {j}: {str(call)}")
+                                else:
+                                    try:
+                                        tool_calls_str = json.dumps(tool_calls, default=default_serializer)
+                                        logger.warning(f"RAW RESPONSE DEBUG: Single tool_call: {tool_calls_str}")
+                                    except:
+                                        logger.warning(f"RAW RESPONSE DEBUG: Single tool_call: {str(tool_calls)}")
+                            else:
+                                logger.warning(f"RAW RESPONSE DEBUG: tool_calls present = FALSE")
+            except Exception as e:
+                logger.warning(f"RAW RESPONSE DEBUG: Error logging response: {str(e)}")
+                # Try a simpler approach
+                try:
+                    logger.warning(f"RAW RESPONSE DEBUG: Simple response dump: {str(litellm_response)}")
+                except Exception as e2:
+                    logger.warning(f"RAW RESPONSE DEBUG: Failed to log even simple response: {str(e2)}")
             
             # Convert LiteLLM response to Anthropic format
             anthropic_response = convert_litellm_to_anthropic(litellm_response, request)
@@ -1771,13 +3310,13 @@ def print_ascii_logo():
     """
     print(logo)
     print(f"{BOLD}Proxy server for Claude Code with Deepseek and Gemini models {CYAN}(unofficial){RESET}")
-    print(f"Run with: {CYAN}ANTHROPIC_BASE_URL=http://127.0.0.1:8082 claude{RESET}")
+    print(f"Run with: {CYAN}ANTHROPIC_BASE_URL=http://127.0.0.1:8083 claude{RESET}")
     print()
 
 if __name__ == "__main__":
     import sys
     if len(sys.argv) > 1 and sys.argv[1] == "--help":
-        print("Run with: uvicorn server:app --reload --host 0.0.0.0 --port 8082")
+        print("Run with: uvicorn server:app --reload --host 0.0.0.0 --port 8083")
         print("Optional arguments:")
         print("  --always-cot    Always add Chain-of-Thought system prompt for Sonnet models")
         sys.exit(0)
@@ -1786,7 +3325,7 @@ if __name__ == "__main__":
     print_ascii_logo()
     
     # Print status info
-    print(f"Starting server on http://0.0.0.0:8082")
+    print(f"Starting server on http://0.0.0.0:8083")
     print(f"Chain-of-Thought mode: {'ENABLED' if ALWAYS_COT else 'DISABLED (use --always-cot to enable)'}")
     print(f"Mapping: Claude Haiku → {SMALL_MODEL}, Claude Sonnet → {BIG_MODEL}")
     print(f"Debug logging: {'ENABLED' if DEBUG_MODE else 'DISABLED (set DEBUG=true to enable)'}")
@@ -1795,4 +3334,4 @@ if __name__ == "__main__":
     print(f"Ready to process requests...\n")
     
     # Configure uvicorn to run with minimal logs
-    uvicorn.run(app, host="0.0.0.0", port=8082, log_level="error")
+    uvicorn.run(app, host="0.0.0.0", port=8083, log_level="error")
