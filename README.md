@@ -109,6 +109,48 @@ SMALL_MODEL=glm-4.5       # Model to use for Haiku tasks
 - ✅ **System prompts** - Full system instruction support
 - ✅ **Chain-of-Thought** - Enhanced reasoning with `--always-cot` flag
 
+## Cost Comparison & Savings 💰
+
+### GLM 4.5 Pricing vs Anthropic Models
+
+*Pricing confirmed from https://open.bigmodel.cn/pricing and https://www.anthropic.com/pricing#api*
+
+| Model | Input Cost (per 1M tokens) | Output Cost (per 1M tokens) | Total for Typical Session* |
+|-------|----------------------------|------------------------------|----------------------------|
+| **Claude Opus 4.1** | $15.00 | $75.00 | $225.00 |
+| **Claude Sonnet 4** | $3.00 | $15.00 | $54.00 |
+| **GLM 4.5 (50% off)** | $0.24 | $0.96 | $3.36 |
+| **GLM 4.5 (full price)** | $0.48 | $1.92 | $6.72 |
+
+*Typical coding session: 20K input tokens, 5K output tokens
+
+### Massive Cost Savings
+
+**With Current 50% Off Promotion (until August 31, 2025):**
+- **98.5% savings** vs Claude Opus ($3.36 vs $225.00)
+- **93.8% savings** vs Claude Sonnet ($3.36 vs $54.00)
+
+**Even at Full Price (after August 31, 2025):**
+- **97.0% savings** vs Claude Opus ($6.72 vs $225.00)
+- **87.6% savings** vs Claude Sonnet ($6.72 vs $54.00)
+
+### Promotional Benefits
+
+🎉 **Current Limited-Time Offers:**
+- **50% discount** on all GLM models until **August 31, 2025**
+- **1M free tokens** for new registrations (worth $1.44 at full price)
+- Additional promotional credits available through Zhipu AI platform
+
+### Annual Cost Projection
+
+For a developer using 500K tokens/month:
+- **Claude Opus**: ~$13,500/year
+- **Claude Sonnet**: ~$2,700/year  
+- **GLM 4.5 (50% off)**: ~$162/year
+- **GLM 4.5 (full price)**: ~$324/year
+
+**Bottom line**: GLM 4.5 delivers comparable performance at a fraction of the cost, making advanced AI assistance accessible for individual developers and small teams.
+
 ## Limitations ⚠️
 
 - **Context window**: Smaller context windows compared to Claude's 200K+
