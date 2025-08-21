@@ -2,7 +2,7 @@
 
 A proxy server that lets you use Claude Code with GLM 4.5, providing a cost-effective alternative while maintaining high-quality code assistance capabilities.
 
-![DEEPSEEK CODE banner](https://raw.githubusercontent.com/kevinnbass/claude-code-deepseek/main/assets/banner.png)
+![GLM 4.5 CODE banner](https://raw.githubusercontent.com/kevinnbass/claude-code-deepseek/main/assets/banner.png)
 
 ## What This Does 🔄
 
