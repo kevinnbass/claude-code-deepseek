@@ -134,20 +134,20 @@ SMALL_MODEL=glm-4.5       # Model to use for Haiku tasks
 
 | Model | Session Cost | Annual Cost (500K tokens/month) |
 |-------|-------------|--------------------------------|
-| **Claude Opus 4.1** | $675.00 | $40,500 |
-| **Claude Sonnet 4** | $135.00 | $8,100 |
-| **GLM 4.5 (50% off)** | $4.20 | $252 |
-| **GLM 4.5 (full price)** | $8.40 | $504 |
+| **Claude Opus 4.1** | $0.68 | $408 |
+| **Claude Sonnet 4** | $0.135 | $81 |
+| **GLM 4.5 (50% off)** | $0.0042 | $2.52 |
+| **GLM 4.5 (full price)** | $0.0084 | $5.04 |
 
 ### Massive Cost Savings
 
 **With Current 50% Off Promotion (until August 31, 2025):**
-- **99.4% savings** vs Claude Opus ($4.20 vs $675.00)
-- **96.9% savings** vs Claude Sonnet ($4.20 vs $135.00)
+- **99.4% savings** vs Claude Opus ($0.0042 vs $0.68)
+- **96.9% savings** vs Claude Sonnet ($0.0042 vs $0.135)
 
 **Even at Full Price (after August 31, 2025):**
-- **98.8% savings** vs Claude Opus ($8.40 vs $675.00)
-- **93.8% savings** vs Claude Sonnet ($8.40 vs $135.00)
+- **98.8% savings** vs Claude Opus ($0.0084 vs $0.68)
+- **93.8% savings** vs Claude Sonnet ($0.0084 vs $0.135)
 
 ### Promotional Benefits
 
