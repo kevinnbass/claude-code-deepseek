@@ -130,30 +130,30 @@ SMALL_MODEL=glm-4.5       # Model to use for Haiku tasks
 | **Claude Opus 4.1** | $15.00 | $75.00 |
 | **Claude Sonnet 4** | $3.00 (≤200K) / $6.00 (>200K) | $15.00 (≤200K) / $22.50 (>200K) |
 
-**Cost Comparison for Typical Coding Session (20K input, 5K output tokens):**
+**Cost Comparison for Heavy Usage (20M tokens/month - 16M input, 4M output):**
 
-| Model | Session Cost | Annual Cost (500K tokens/month) |
-|-------|-------------|--------------------------------|
-| **Claude Opus 4.1** | $0.68 | $408 |
-| **Claude Sonnet 4** | $0.135 | $81 |
-| **GLM 4.5 (50% off)** | $0.0042 | $2.52 |
-| **GLM 4.5 (full price)** | $0.0084 | $5.04 |
+| Model | Monthly Cost | Annual Cost |
+|-------|-------------|-------------|
+| **Claude Opus 4.1** | $540.00 | $6,480 |
+| **Claude Sonnet 4** | $108.00 | $1,296 |
+| **GLM 4.5 (50% off)** | $3.36 | $40.32 |
+| **GLM 4.5 (full price)** | $6.72 | $80.64 |
 
 ### Massive Cost Savings
 
 **With Current 50% Off Promotion (until August 31, 2025):**
-- **99.4% savings** vs Claude Opus ($0.0042 vs $0.68)
-- **96.9% savings** vs Claude Sonnet ($0.0042 vs $0.135)
+- **99.4% savings** vs Claude Opus ($3.36 vs $540.00 monthly)
+- **96.9% savings** vs Claude Sonnet ($3.36 vs $108.00 monthly)
 
 **Even at Full Price (after August 31, 2025):**
-- **98.8% savings** vs Claude Opus ($0.0084 vs $0.68)
-- **93.8% savings** vs Claude Sonnet ($0.0084 vs $0.135)
+- **98.8% savings** vs Claude Opus ($6.72 vs $540.00 monthly)
+- **93.8% savings** vs Claude Sonnet ($6.72 vs $108.00 monthly)
 
 ### Promotional Benefits
 
 🎉 **Current Limited-Time Offers:**
 - **50% discount** on all GLM models until **August 31, 2025**
-- **20M free tokens** for new registrations (worth $11.20 at full price!)
+- **Free registration credits** available (check https://open.bigmodel.cn for current offers)
 - Tiered pricing that scales with usage - pay less for smaller context windows
 - Additional promotional credits available through Zhipu AI platform
 
