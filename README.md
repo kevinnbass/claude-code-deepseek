@@ -1,37 +1,35 @@
-# Claude Code with Deepseek and Gemini Models 🧠
+# Claude Code with GLM 4.5 🧠
 
-A proxy server that lets you use Claude Code with Deepseek and Google Gemini models, providing a cost-effective alternative while maintaining high-quality code assistance capabilities. This solution delivers up to **96% cost savings** compared to using Claude directly, with comparable or better performance for many tasks.
+A proxy server that lets you use Claude Code with GLM 4.5, providing a cost-effective alternative while maintaining high-quality code assistance capabilities.
 
 ![DEEPSEEK CODE banner](https://raw.githubusercontent.com/kevinnbass/claude-code-deepseek/main/assets/banner.png)
 
 ## What This Does 🔄
 
-This proxy acts as a bridge between the Claude Code client and alternative AI models:
+This proxy acts as a bridge between the Claude Code client and GLM 4.5:
 
 1. It intercepts requests from Claude Code intended for Anthropic's API
-2. Transforms these requests into a format compatible with Deepseek or Gemini models
-3. Forwards them to the appropriate API service
+2. Transforms these requests into a format compatible with GLM 4.5
+3. Forwards them to the GLM API service
 4. Converts responses back to match Anthropic's expected format
 5. Returns them to the Claude Code client
 
-The result: You can use Claude Code's excellent interface while leveraging more affordable Deepseek and Gemini models.
+The result: You can use Claude Code's excellent interface while leveraging the powerful GLM 4.5 model.
 
 ### Key Benefits 💰
 
-- **Massive Cost Savings**: Use Claude Code with up to 96% lower costs
-- **Similar Performance**: Comparable response quality for code tasks
-- **Best of Both Worlds**: Use cost-effective models for most tasks, but access Claude 3.7 for brainstorming
+- **Cost Savings**: Use Claude Code with more affordable GLM 4.5
+- **High Performance**: GLM 4.5 provides excellent code assistance capabilities
+- **Unified Model**: All requests use the same high-quality GLM 4.5 model
 - **Transparency**: Use the same Claude Code interface without changing your workflow
-- **Flexibility**: Choose which models to use for different types of tasks
-- **Customizability**: Added features not available in Claude Code by default
+- **Enhanced Features**: Added `/brainstorm` command and other customizations
+- **High Token Limits**: GLM 4.5 supports up to 98K output tokens
 
 ## Quick Start ⚡
 
 ### Prerequisites
 
-- Deepseek API key 🔑 (for Sonnet models)
-- Gemini API key 🔑 (for Haiku models)
-- Anthropic API key 🔑 (optional, required only for `/brainstorm` command)
+- GLM API key 🔑 (for all models - get from https://open.bigmodel.cn)
 - Node.js (for Claude Code CLI)
 
 ### Setup 🛠️
@@ -55,11 +53,9 @@ The result: You can use Claude Code's excellent interface while leveraging more 
    cp .env.example .env
    ```
    
-   Then edit the `.env` file with your API keys:
+   Then edit the `.env` file with your API key:
    ```
-   DEEPSEEK_API_KEY=your-deepseek-key  # Get from https://platform.deepseek.com
-   GEMINI_API_KEY=your-gemini-key      # Get from https://ai.google.dev/
-   ANTHROPIC_API_KEY=your-anthropic-key  # Optional, needed for /brainstorm
+   GLM_API_KEY=your-glm-key  # Get from https://open.bigmodel.cn
    ```
 
 4. **Start the proxy server**:
@@ -95,13 +91,13 @@ The result: You can use Claude Code's excellent interface while leveraging more 
 
 | Claude Model | Mapped Model | Provider | Use Case |
 |--------------|--------------|----------|----------|
-| claude-3-haiku | gemini-2.0-flash | Google | Quick responses, simpler tasks |
-| claude-3-sonnet | deepseek-chat | Deepseek | Complex reasoning, longer code generation |
+| claude-3-haiku | glm-4.5 | GLM | All tasks - high-quality responses |
+| claude-3-sonnet | glm-4.5 | GLM | All tasks - high-quality responses |
 
 Customize via environment variables:
 ```
-BIG_MODEL=deepseek-chat         # Model to use for Sonnet tasks
-SMALL_MODEL=gemini-2.0-flash    # Model to use for Haiku tasks
+BIG_MODEL=glm-4.5         # Model to use for Sonnet tasks
+SMALL_MODEL=glm-4.5       # Model to use for Haiku tasks  
 ```
 
 ### Core Capabilities ✨
@@ -113,44 +109,10 @@ SMALL_MODEL=gemini-2.0-flash    # Model to use for Haiku tasks
 - ✅ **System prompts** - Full system instruction support
 - ✅ **Chain-of-Thought** - Enhanced reasoning with `--always-cot` flag
 
-## Performance & Cost Comparison 📊
-
-### Response Times
-
-| Task Type | Gemini Flash | Deepseek Chat | Claude | Performance |
-|-----------|--------------|---------------|--------|-------------|
-| Simple text | 0.7-0.8s | - | 1.0-1.1s | 0.7x (faster) |
-| Tool usage | 0.6-0.7s | - | ~1.0s | 0.65x (faster) |
-| Complex reasoning | - | 15-16s | ~7-8s | 2.0x (slower) |
-| Code generation | - | 15-20s | ~16s | 1.1x (similar) |
-
-**Key observations:**
-* Gemini Flash is faster than Claude Haiku for simple tasks
-* Deepseek Chat takes longer for complex reasoning but produces high-quality outputs
-* Code generation performance is comparable to Claude
-* Performance formula: Haiku tasks = 0.7x Claude time, Sonnet tasks = ~2.0x Claude time
-
-### Cost Savings
-
-| Model | Input Cost | Output Cost | Relative Cost |
-|-------|------------|-------------|---------------|
-| **Claude 3.7 Sonnet** | $3.00 per 1M | $15.00 per 1M | Baseline |
-| **DeepSeek Chat** | $0.135 per 1M | $0.55 per 1M | ~3.7% of Claude |
-| **Claude 3.5 Haiku** | $0.80 per 1M | $4.00 per 1M | Baseline |
-| **Gemini 2.0 Flash** | $0.10 per 1M | $0.40 per 1M | ~10% of Claude |
-
-For a typical coding session (20K input, 5K output tokens):
-- **Claude Sonnet**: $135
-- **DeepSeek Chat**: $5.47 (~96% savings)
-- **Claude Haiku**: $36
-- **Gemini Flash**: $3.02 (~92% savings)
-
 ## Limitations ⚠️
 
-- **Token limit**: Maximum output token limit of 8192
-- **Response time**: Complex reasoning tasks with Deepseek can take 30-45 seconds vs. Claude's 2-3s
-- **Context window**: Smaller context windows (8K tokens vs. Claude's 200K+)
-- **Multimodal content**: Image processing capabilities may vary by model
+- **Context window**: Smaller context windows compared to Claude's 200K+
+- **Multimodal content**: Limited compared to Claude's multimodal capabilities
 
 ## Technical Details 🔧
 
@@ -172,15 +134,15 @@ For a typical coding session (20K input, 5K output tokens):
 ### How It Works
 
 1. The proxy receives requests from Claude Code in Anthropic's format
-2. It identifies request type and routes to appropriate provider
-3. It transforms the request format for the target API
-4. For Sonnet models, it optionally adds Chain-of-Thought prompting
+2. It routes all requests to GLM 4.5 via the GLM API
+3. It transforms the request format for the GLM API
+4. It optionally adds Chain-of-Thought prompting (when `--always-cot` flag is used)
 5. It processes the response and converts it back to Anthropic's format
 6. The Claude Code client receives responses in the expected format
 
 ### Special Feature: `/brainstorm` Command ✨
 
-This proxy extends Claude Code with custom slash commands for specialized tasks. The most powerful is the `/brainstorm` command that connects directly to Claude 3.7 Sonnet for exceptional brainstorming quality.
+This proxy extends Claude Code with custom slash commands for specialized tasks. The most powerful is the `/brainstorm` command that uses GLM 4.5 with a specialized brainstorming system prompt.
 
 Generate creative ideas for any code challenge or problem:
 
@@ -188,19 +150,15 @@ Generate creative ideas for any code challenge or problem:
 /brainstorm How can I optimize CI/CD pipelines for our microservices architecture?
 ```
 
-![Brainstorm Command Example](https://raw.githubusercontent.com/kevinnbass/claude-code-deepseek/main/assets/brainstorm-example.png)
-
 The `/brainstorm` command:
 - Uses a specialized system prompt tailored for code-related brainstorming
-- **Connects directly to Claude 3.7 Sonnet** (requires ANTHROPIC_API_KEY)
+- **Powered by GLM 4.5** with enhanced reasoning capabilities
 - Generates diverse, actionable ideas with implementation details and code snippets
 - Includes tradeoffs and considerations for each solution
 
-**When to use**: Architecture decisions, code optimization, refactoring approaches, testing strategies, and when quality of ideas is more important than response speed.
+**When to use**: Architecture decisions, code optimization, refactoring approaches, testing strategies, and creative problem solving.
 
 **Example use cases:** API design, database optimization, refactoring approaches, testing strategies, performance optimization, and error handling patterns.
-
-Note: The `/brainstorm` command is the only feature that uses the Anthropic API; all other interactions use the cost-saving models.
 
 Future planned commands include `/debug`, `/refactor`, and `/perf`. Contributions welcome!
 
