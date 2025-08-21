@@ -97,16 +97,21 @@ app = FastAPI()
 
 # Get API keys from environment
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
-DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY")
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+GLM_API_KEY = os.environ.get("GLM_API_KEY")
 
 # Get model mapping configuration from environment
-# deepseek-chat is recommended for all tasks including coding
-BIG_MODEL = os.environ.get("BIG_MODEL", "deepseek-chat")
-SMALL_MODEL = os.environ.get("SMALL_MODEL", "gemini-2.0-flash")  # Default to Gemini Flash for Haiku
+# glm-4.5 is used for all tasks
+BIG_MODEL = os.environ.get("BIG_MODEL", "glm-4.5")
+SMALL_MODEL = os.environ.get("SMALL_MODEL", "glm-4.5")  # Use GLM-4.5 for all models
+
+# Configure GLM model mapping for LiteLLM
+if GLM_API_KEY:
+    # Set GLM API configuration
+    os.environ["OPENAI_API_KEY"] = GLM_API_KEY  # LiteLLM uses OPENAI_API_KEY for custom endpoints
+    os.environ["OPENAI_API_BASE"] = "https://open.bigmodel.cn/api/paas/v4"
 
 # Parse command-line arguments
-parser = argparse.ArgumentParser(description="Anthropic Proxy Server for Deepseek and Gemini")
+parser = argparse.ArgumentParser(description="Anthropic Proxy Server for GLM")
 parser.add_argument('--always-cot', action='store_true', help='Always add Chain-of-Thought system prompt for Sonnet models')
 args, _ = parser.parse_known_args()
 ALWAYS_COT = args.always_cot
@@ -114,7 +119,7 @@ ALWAYS_COT = args.always_cot
 if ALWAYS_COT:
     logger.warning("🧠 ALWAYS_COT mode activated: Chain-of-Thought will be added to all Sonnet model requests")
 
-# Chain of Thought system prompt for reasoning (used only when Sonnet models are mapped to Deepseek)
+# Chain of Thought system prompt for reasoning (used when Sonnet models are mapped to GLM)
 COT_SYSTEM_PROMPT = "You are a helpful assistant that uses chain-of-thought reasoning. For complex questions, always break down your reasoning step-by-step before giving an answer."
 
 # Models for Anthropic API requests
@@ -175,23 +180,23 @@ class MessagesRequest(BaseModel):
         # Store the original model name
         original_model = v
         
-        # Check if we're using Deepseek/Gemini models and need to swap
+        # Check if we're using GLM models and need to swap
         if USE_OPENAI_MODELS:
             # Remove anthropic/ prefix if it exists
             if v.startswith('anthropic/'):
                 v = v[10:]  # Remove 'anthropic/' prefix
             
-            # Swap Haiku with Gemini Flash model
+            # Map Haiku to GLM model via OpenAI compatibility
             if 'haiku' in v.lower():
-                # Use Gemini model for Haiku requests
-                new_model = f"gemini/{SMALL_MODEL}"
+                # Use GLM model via OpenAI compatibility for Haiku requests
+                new_model = f"openai/{SMALL_MODEL}"
                 logger.debug(f"📌 MODEL MAPPING: {original_model} ➡️ {new_model}")
                 v = new_model
             
             # Handle Sonnet models
             elif 'sonnet' in v.lower():
-                # Map Sonnet to the configured big model
-                new_model = f"deepseek/{BIG_MODEL}"
+                # Map Sonnet to GLM model via OpenAI compatibility
+                new_model = f"openai/{BIG_MODEL}"
                 v = new_model
                 
                 # Check if thinking is enabled to decide whether to add CoT
@@ -239,9 +244,9 @@ class MessagesRequest(BaseModel):
                         # No CoT for normal mode
                         logger.debug(f"📌 MODEL MAPPING: {original_model} ➡️ {new_model} (normal mode)")
             
-            # Keep the model as is but add deepseek/ prefix if not already present
-            elif not v.startswith('deepseek/'):
-                new_model = f"deepseek/{v}"
+            # Keep the model as is but add openai/ prefix if not already present
+            elif not v.startswith('openai/'):
+                new_model = f"openai/{v}"
                 logger.debug(f"📌 MODEL MAPPING: {original_model} ➡️ {new_model}")
                 v = new_model
                 
@@ -349,9 +354,9 @@ class TokenCountRequest(BaseModel):
                         # No CoT for normal mode
                         logger.debug(f"📌 MODEL MAPPING: {original_model} ➡️ {new_model} (normal mode)")
             
-            # Keep the model as is but add deepseek/ prefix if not already present
-            elif not v.startswith('deepseek/'):
-                new_model = f"deepseek/{v}"
+            # Keep the model as is but add openai/ prefix if not already present
+            elif not v.startswith('openai/'):
+                new_model = f"openai/{v}"
                 logger.debug(f"📌 MODEL MAPPING: {original_model} ➡️ {new_model}")
                 v = new_model
             
@@ -586,11 +591,12 @@ def convert_anthropic_to_litellm(anthropic_request: MessagesRequest) -> Dict[str
                 
                 messages.append({"role": msg.role, "content": processed_content})
     
-    # Cap max_tokens for Deepseek and Gemini models to their limit of 8192
+    # Cap max_tokens for GLM models to their limit (GLM-4.5 supports up to 98304 tokens output)
     max_tokens = anthropic_request.max_tokens
-    if anthropic_request.model.startswith("deepseek/") or anthropic_request.model.startswith("gemini/") or USE_OPENAI_MODELS:
-        max_tokens = min(max_tokens, 8192)
-        logger.debug(f"Capping max_tokens to 8192 for {anthropic_request.model} (original value: {anthropic_request.max_tokens})")
+    if anthropic_request.model.startswith("glm/") or USE_OPENAI_MODELS:
+        # GLM-4.5 supports higher limits than the previous models
+        max_tokens = min(max_tokens, 98304)
+        logger.debug(f"Capping max_tokens to 98304 for {anthropic_request.model} (original value: {anthropic_request.max_tokens})")
     
     # Create LiteLLM request dict
     litellm_request = {
@@ -603,7 +609,7 @@ def convert_anthropic_to_litellm(anthropic_request: MessagesRequest) -> Dict[str
     
     # Add thinking parameter if present (newer Claude API feature)
     if anthropic_request.thinking:
-        # For OpenAI-compatible APIs like Deepseek, we include this in metadata
+        # For OpenAI-compatible APIs like GLM, we include this in metadata
         # Since they don't directly support the thinking parameter
         if not "metadata" in litellm_request:
             litellm_request["metadata"] = {}
@@ -692,13 +698,12 @@ def convert_litellm_to_anthropic(litellm_response: Union[Dict[str, Any], Any],
         clean_model = original_request.model
         if clean_model.startswith("anthropic/"):
             clean_model = clean_model[len("anthropic/"):]
-        elif clean_model.startswith("deepseek/"):
-            clean_model = clean_model[len("deepseek/"):]
-        elif clean_model.startswith("gemini/"):
-            clean_model = clean_model[len("gemini/"):]
+        elif clean_model.startswith("openai/"):
+            clean_model = clean_model[len("openai/"):]
         
         # Check if this is a Claude model (which supports content blocks)
-        is_claude_model = clean_model.startswith("claude-")
+        # GLM models also support tool calls, so we'll treat GLM as supporting content blocks
+        is_claude_model = clean_model.startswith("claude-") or clean_model.startswith("glm-")
         
         # Handle ModelResponse object from LiteLLM
         if hasattr(litellm_response, 'choices') and hasattr(litellm_response, 'usage'):
@@ -1206,22 +1211,20 @@ async def create_message(
         # Convert Anthropic request to LiteLLM format
         litellm_request = convert_anthropic_to_litellm(request)
         
-        # Determine which API key to use based on the model
-        if request.model.startswith("deepseek/"):
-            litellm_request["api_key"] = DEEPSEEK_API_KEY
-            logger.debug(f"Using Deepseek API key for model: {request.model}")
-        elif request.model.startswith("gemini/"):
-            litellm_request["api_key"] = GEMINI_API_KEY
-            logger.debug(f"Using Gemini API key for model: {request.model}")
+        # Determine which API key to use based on the model and set custom base URL for GLM
+        if request.model.startswith("openai/") and "glm" in request.model:
+            litellm_request["api_key"] = GLM_API_KEY
+            litellm_request["api_base"] = "https://open.bigmodel.cn/api/paas/v4"
+            logger.debug(f"Using GLM API key and base URL for model: {request.model}")
         else:
             litellm_request["api_key"] = ANTHROPIC_API_KEY
             logger.debug(f"Using Anthropic API key for model: {request.model}")
         
-        # For Deepseek or Gemini models - modify request format to work with limitations
-        if ("deepseek" in litellm_request["model"] or "gemini" in litellm_request["model"]) and "messages" in litellm_request:
+        # For GLM models - modify request format to work with GLM requirements
+        if "glm" in litellm_request["model"] and "messages" in litellm_request:
             logger.debug(f"Processing {litellm_request['model']} model request")
             
-            # For Deepseek models, we need to convert content blocks to simple strings
+            # For GLM models, we need to convert content blocks to simple strings
             # and handle other requirements
             for i, msg in enumerate(litellm_request["messages"]):
                 # Special case - handle message content directly when it's a list of tool_result
@@ -1335,7 +1338,7 @@ async def create_message(
                     elif msg["content"] is None:
                         litellm_request["messages"][i]["content"] = "..." # Empty content not allowed
                 
-                # 2. Remove any fields OpenAI doesn't support in messages
+                # 2. Remove any fields GLM doesn't support in messages
                 for key in list(msg.keys()):
                     if key not in ["role", "content", "name", "tool_call_id", "tool_calls"]:
                         logger.warning(f"Removing unsupported field from message: {key}")
@@ -1604,85 +1607,69 @@ async def brainstorm(
         # Replace or add the system prompt
         enhanced_request["system"] = BRAINSTORM_PROMPT.format(user_input=user_input)
         
-        # Use Claude 3.7 Sonnet directly from Anthropic for this special command
-        enhanced_request["model"] = "claude-3-7-sonnet-20250219"
+        # Use GLM-4.5 for this special command (via the same proxy logic)
+        enhanced_request["model"] = "claude-3-5-sonnet-20241022"  # This will be mapped to GLM-4.5
         
-        # Check if Anthropic API key is available
-        if not ANTHROPIC_API_KEY:
-            logger.error("No Anthropic API key found for /brainstorm command - this command requires access to Claude 3.7")
+        # Check if GLM API key is available
+        if not GLM_API_KEY:
+            logger.error("No GLM API key found for /brainstorm command - this command requires GLM-4.5")
             return JSONResponse(
                 status_code=500,
-                content={"error": "The /brainstorm command requires an Anthropic API key. Please set ANTHROPIC_API_KEY in your .env file."}
+                content={"error": "The /brainstorm command requires a GLM API key. Please set GLM_API_KEY in your .env file."}
             )
             
-        logger.info(f"🔄 Using Claude 3.7 Sonnet directly from Anthropic API for /brainstorm command")
+        logger.info(f"🔄 Using GLM-4.5 via proxy for /brainstorm command")
         
-        # Prepare the Anthropic request
-        anthropic_request = {
-            "model": enhanced_request["model"],
-            "max_tokens": enhanced_request.get("max_tokens", 1500),
-            "messages": enhanced_request["messages"],
-            "system": enhanced_request["system"],
-            "stream": enhanced_request.get("stream", False)
-        }
-        
-        # Add any optional parameters
-        for param in ["temperature", "top_p", "top_k"]:
-            if param in enhanced_request:
-                anthropic_request[param] = enhanced_request[param]
-                
-        # Prepare Anthropic API headers
-        anthropic_headers = {
-            "x-api-key": ANTHROPIC_API_KEY,
-            "anthropic-version": "2023-06-01",
-            "content-type": "application/json",
-        }
-        
-        # Process the request directly through Anthropic API
-        if anthropic_request.get("stream", False):
-            async def stream_anthropic_response():
-                async with httpx.AsyncClient() as client:
-                    async with client.stream(
-                        "POST", 
-                        ANTHROPIC_API_URL, 
-                        json=anthropic_request,
-                        headers=anthropic_headers,
-                        timeout=60
-                    ) as response:
-                        if response.status_code != 200:
-                            error_text = await response.aread()
-                            logger.error(f"Error from Anthropic API: {error_text.decode('utf-8')}")
-                            error_json = {"error": f"Anthropic API error: {response.status_code}"}
-                            yield f"data: {json.dumps(error_json)}\n\n"
-                            yield "data: [DONE]\n\n"
-                            return
-                            
-                        async for chunk in response.aiter_bytes():
-                            yield chunk
+        # Create a proper MessagesRequest object and process it through the same proxy logic
+        from pydantic import ValidationError
+        try:
+            # Parse the enhanced request into our MessagesRequest format
+            request_obj = MessagesRequest(**enhanced_request)
             
-            return StreamingResponse(
-                stream_anthropic_response(),
-                media_type="text/event-stream"
+            # Use the same proxy logic as the main endpoint
+            litellm_request = convert_anthropic_to_litellm(request_obj)
+            
+            # Set GLM API key and base URL
+            if request_obj.model.startswith("openai/") and "glm" in request_obj.model:
+                litellm_request["api_key"] = GLM_API_KEY
+                litellm_request["api_base"] = "https://open.bigmodel.cn/api/paas/v4"
+                logger.debug(f"Using GLM API key and base URL for brainstorm model: {request_obj.model}")
+            
+            # Process GLM request format requirements
+            if "glm" in litellm_request["model"] and "messages" in litellm_request:
+                logger.debug(f"Processing {litellm_request['model']} brainstorm request")
+                
+                # Apply the same GLM formatting logic as the main endpoint
+                for i, msg in enumerate(litellm_request["messages"]):
+                    if "content" in msg and isinstance(msg["content"], list):
+                        text_content = ""
+                        for block in msg["content"]:
+                            if isinstance(block, dict) and block.get("type") == "text":
+                                text_content += block.get("text", "") + "\n"
+                        if not text_content.strip():
+                            text_content = "..."
+                        litellm_request["messages"][i]["content"] = text_content.strip()
+                    elif msg["content"] is None:
+                        litellm_request["messages"][i]["content"] = "..."
+            
+            # Handle streaming vs non-streaming
+            if enhanced_request.get("stream", False):
+                response_generator = await litellm.acompletion(**litellm_request)
+                return StreamingResponse(
+                    handle_streaming(response_generator, request_obj),
+                    media_type="text/event-stream"
+                )
+            else:
+                litellm_response = litellm.completion(**litellm_request)
+                anthropic_response = convert_litellm_to_anthropic(litellm_response, request_obj)
+                return anthropic_response
+                
+        except ValidationError as e:
+            logger.error(f"Validation error in brainstorm request: {str(e)}")
+            return JSONResponse(
+                status_code=400,
+                content={"error": f"Request validation error: {str(e)}"}
             )
-        else:
-            # Make a synchronous request to Anthropic API
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    ANTHROPIC_API_URL,
-                    json=anthropic_request,
-                    headers=anthropic_headers,
-                    timeout=60
-                )
-            
-            if response.status_code != 200:
-                logger.error(f"Error from Anthropic API: {response.text}")
-                return JSONResponse(
-                    status_code=response.status_code,
-                    content={"error": f"Anthropic API error: {response.text}"}
-                )
-                
-            # Simply return the Anthropic response directly
-            return response.json()
     
     except Exception as e:
         logger.error(f"Error in brainstorm endpoint: {str(e)}")
@@ -1695,7 +1682,7 @@ async def brainstorm(
 
 @app.get("/")
 async def root():
-    return {"message": "Anthropic Proxy for Deepseek and Gemini using LiteLLM"}
+    return {"message": "Anthropic Proxy for GLM using LiteLLM"}
 
 # Define ANSI color codes for terminal output
 class Colors:
@@ -1709,8 +1696,8 @@ class Colors:
     BOLD = "\033[1m"
     UNDERLINE = "\033[4m"
     DIM = "\033[2m"
-def log_request_beautifully(method, path, claude_model, deepseek_model, num_messages, num_tools, status_code):
-    """Log requests in a beautiful, twitter-friendly format showing Claude to Deepseek mapping."""
+def log_request_beautifully(method, path, claude_model, glm_model, num_messages, num_tools, status_code):
+    """Log requests in a beautiful format showing Claude to GLM mapping."""
     # Format the Claude model name nicely
     claude_display = f"{Colors.CYAN}{claude_model}{Colors.RESET}"
     
@@ -1720,13 +1707,13 @@ def log_request_beautifully(method, path, claude_model, deepseek_model, num_mess
         endpoint = endpoint.split("?")[0]
     
     # Extract just the target model name without provider prefix
-    target_display = deepseek_model
+    target_display = glm_model
     if "/" in target_display:
         target_display = target_display.split("/")[-1]
     
     # Color based on provider
-    if "gemini" in target_display:
-        target_display = f"{Colors.YELLOW}{target_display}{Colors.RESET}"
+    if "glm" in target_display:
+        target_display = f"{Colors.CYAN}{target_display}{Colors.RESET}"
     else:
         target_display = f"{Colors.GREEN}{target_display}{Colors.RESET}"
     
@@ -1755,12 +1742,12 @@ def print_ascii_logo():
     BOLD = "\033[1m"
     
     logo = f"""{BLUE}{BOLD}
-████████╗███████╗███████╗██████╗ ███████╗███████╗███████╗██╗  ██╗
-██╔═══██╗██╔════╝██╔════╝██╔══██╗██╔════╝██╔════╝██╔════╝██║ ██╔╝
-██║   ██║█████╗  █████╗  ██████╔╝███████╗█████╗  █████╗  █████╔╝ 
-██║   ██║██╔══╝  ██╔══╝  ██╔═══╝ ╚════██║██╔══╝  ██╔══╝  ██╔═██╗ 
-████████║███████╗███████╗██║     ███████║███████╗███████╗██║  ██╗
-╚═══════╝╚══════╝╚══════╝╚═╝     ╚══════╝╚══════╝╚══════╝╚═╝  ╚═╝
+ ██████╗ ██╗     ███╗   ███╗    ██╗  ██╗    ███████╗
+██╔════╝ ██║     ████╗ ████║    ██║  ██║    ██╔════╝
+██║  ███╗██║     ██╔████╔██║    ███████║    ███████╗
+██║   ██║██║     ██║╚██╔╝██║    ╚════██║    ╚════██║
+╚██████╔╝███████╗██║ ╚═╝ ██║         ██║ ██╗███████║
+ ╚═════╝ ╚══════╝╚═╝     ╚═╝         ╚═╝ ╚═╝╚══════╝
 
 {CYAN} ██████╗ ██████╗ ██████╗ ███████╗
 ██╔════╝██╔═══██╗██╔══██╗██╔════╝
@@ -1770,7 +1757,7 @@ def print_ascii_logo():
  ╚═════╝ ╚═════╝ ╚═════╝ ╚══════╝{RESET}
     """
     print(logo)
-    print(f"{BOLD}Proxy server for Claude Code with Deepseek and Gemini models {CYAN}(unofficial){RESET}")
+    print(f"{BOLD}Proxy server for Claude Code with GLM models {CYAN}(unofficial){RESET}")
     print(f"Run with: {CYAN}ANTHROPIC_BASE_URL=http://127.0.0.1:8082 claude{RESET}")
     print()
 
@@ -1788,10 +1775,10 @@ if __name__ == "__main__":
     # Print status info
     print(f"Starting server on http://0.0.0.0:8082")
     print(f"Chain-of-Thought mode: {'ENABLED' if ALWAYS_COT else 'DISABLED (use --always-cot to enable)'}")
-    print(f"Mapping: Claude Haiku → {SMALL_MODEL}, Claude Sonnet → {BIG_MODEL}")
+    print(f"Mapping: All Claude models → {BIG_MODEL}")
     print(f"Debug logging: {'ENABLED' if DEBUG_MODE else 'DISABLED (set DEBUG=true to enable)'}")
-    anthropic_key_status = "AVAILABLE" if ANTHROPIC_API_KEY else "NOT AVAILABLE (required for /brainstorm)"
-    print(f"Custom commands: /brainstorm (uses Claude 3.7, Anthropic API key: {anthropic_key_status})")
+    glm_key_status = "AVAILABLE" if GLM_API_KEY else "NOT AVAILABLE (required for /brainstorm)"
+    print(f"Custom commands: /brainstorm (uses GLM-4.5, GLM API key: {glm_key_status})")
     print(f"Ready to process requests...\n")
     
     # Configure uvicorn to run with minimal logs
