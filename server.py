@@ -113,8 +113,14 @@ if GLM_API_KEY:
 # Parse command-line arguments
 parser = argparse.ArgumentParser(description="Anthropic Proxy Server for GLM")
 parser.add_argument('--always-cot', action='store_true', help='Always add Chain-of-Thought system prompt for Sonnet models')
+parser.add_argument('--host', type=str, default='0.0.0.0', help='Host to bind the server to (default: 0.0.0.0)')
+parser.add_argument('--port', type=int, default=8082, help='Port to bind the server to (default: 8082)')
+parser.add_argument('--instance-id', type=str, help='Instance identifier for logging multiple servers')
 args, _ = parser.parse_known_args()
 ALWAYS_COT = args.always_cot
+SERVER_HOST = args.host
+SERVER_PORT = args.port
+INSTANCE_ID = args.instance_id
 
 if ALWAYS_COT:
     logger.warning("🧠 ALWAYS_COT mode activated: Chain-of-Thought will be added to all Sonnet model requests")
@@ -1764,22 +1770,30 @@ def print_ascii_logo():
 if __name__ == "__main__":
     import sys
     if len(sys.argv) > 1 and sys.argv[1] == "--help":
-        print("Run with: uvicorn server:app --reload --host 0.0.0.0 --port 8082")
+        print("Run with: python server.py --host 0.0.0.0 --port 8082")
         print("Optional arguments:")
-        print("  --always-cot    Always add Chain-of-Thought system prompt for Sonnet models")
+        print("  --always-cot        Always add Chain-of-Thought system prompt for Sonnet models")
+        print("  --host HOST         Host to bind the server to (default: 0.0.0.0)")
+        print("  --port PORT         Port to bind the server to (default: 8082)")
+        print("  --instance-id ID    Instance identifier for logging multiple servers")
+        print("\nExamples:")
+        print("  python server.py --always-cot")
+        print("  python server.py --host 127.0.0.1 --port 8083 --instance-id server1")
+        print("  python server.py --host 127.0.0.1 --port 8084 --instance-id server2")
         sys.exit(0)
     
     # Display ASCII logo
     print_ascii_logo()
     
     # Print status info
-    print(f"Starting server on http://0.0.0.0:8082")
-    print(f"Chain-of-Thought mode: {'ENABLED' if ALWAYS_COT else 'DISABLED (use --always-cot to enable)'}")
-    print(f"Mapping: All Claude models → {BIG_MODEL}")
-    print(f"Debug logging: {'ENABLED' if DEBUG_MODE else 'DISABLED (set DEBUG=true to enable)'}")
+    instance_prefix = f"[{INSTANCE_ID}] " if INSTANCE_ID else ""
+    print(f"{instance_prefix}Starting server on http://{SERVER_HOST}:{SERVER_PORT}")
+    print(f"{instance_prefix}Chain-of-Thought mode: {'ENABLED' if ALWAYS_COT else 'DISABLED (use --always-cot to enable)'}")
+    print(f"{instance_prefix}Mapping: All Claude models → {BIG_MODEL}")
+    print(f"{instance_prefix}Debug logging: {'ENABLED' if DEBUG_MODE else 'DISABLED (set DEBUG=true to enable)'}")
     glm_key_status = "AVAILABLE" if GLM_API_KEY else "NOT AVAILABLE (required for /brainstorm)"
-    print(f"Custom commands: /brainstorm (uses GLM-4.5, GLM API key: {glm_key_status})")
-    print(f"Ready to process requests...\n")
-    
+    print(f"{instance_prefix}Custom commands: /brainstorm (uses GLM-4.5, GLM API key: {glm_key_status})")
+    print(f"{instance_prefix}Ready to process requests...\n")
+
     # Configure uvicorn to run with minimal logs
-    uvicorn.run(app, host="0.0.0.0", port=8082, log_level="error")
+    uvicorn.run(app, host=SERVER_HOST, port=SERVER_PORT, log_level="error")
